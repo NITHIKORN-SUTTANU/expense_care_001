@@ -42,10 +42,12 @@ class DailyBudgetCard extends StatelessWidget {
     final error = isDark ? AppColors.darkError : AppColors.error;
     final statusColor = _statusColor(context);
 
-    final bgGradientColor =
-        _isOverBudget ? error.withOpacity(0.08) : primary.withOpacity(0.06);
-    final borderColor =
-        _isOverBudget ? error.withOpacity(0.3) : primary.withOpacity(0.2);
+    final bgGradientColor = _isOverBudget
+        ? error.withValues(alpha: 0.08)
+        : primary.withValues(alpha: 0.06);
+    final borderColor = _isOverBudget
+        ? error.withValues(alpha: 0.3)
+        : primary.withValues(alpha: 0.2);
 
     return Container(
       decoration: BoxDecoration(
@@ -63,7 +65,7 @@ class DailyBudgetCard extends StatelessWidget {
             ? null
             : [
                 BoxShadow(
-                  color: (primary).withOpacity(0.08),
+                  color: (primary).withValues(alpha: 0.08),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
@@ -116,7 +118,7 @@ class DailyBudgetCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.15),
+                  color: statusColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(AppRadius.chip),
                 ),
                 child: Text(

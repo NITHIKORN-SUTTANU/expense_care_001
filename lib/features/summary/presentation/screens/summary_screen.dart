@@ -242,7 +242,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 7, vertical: 3),
                             decoration: BoxDecoration(
-                              color: cat.color.withOpacity(0.15),
+                              color: cat.color.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(

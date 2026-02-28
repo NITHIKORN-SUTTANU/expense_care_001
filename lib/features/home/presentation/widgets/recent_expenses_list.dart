@@ -122,7 +122,7 @@ class _ExpenseRow extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: catColor.withOpacity(0.15),
+              color: catColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(

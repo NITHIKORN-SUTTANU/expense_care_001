@@ -330,7 +330,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         isDark: isDark,
                         labelColor:
                             (isDark ? AppColors.darkError : AppColors.error)
-                                .withOpacity(0.7),
+                                .withValues(alpha: 0.7),
                         showDivider: false,
                         onTap: _handleDeleteAccount,
                       ),
@@ -373,7 +373,7 @@ class _UserInfoSection extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: primary.withOpacity(0.3),
+                color: primary.withValues(alpha: 0.3),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),

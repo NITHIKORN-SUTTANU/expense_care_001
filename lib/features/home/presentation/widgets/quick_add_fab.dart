@@ -37,7 +37,7 @@ class QuickAddFab extends StatelessWidget {
           ),
         ).copyWith(
           overlayColor: WidgetStateProperty.all(
-            Colors.white.withOpacity(0.1),
+            Colors.white.withValues(alpha: 0.1),
           ),
           backgroundColor: WidgetStateProperty.resolveWith(
             (states) =>

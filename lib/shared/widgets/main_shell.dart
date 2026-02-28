@@ -59,7 +59,7 @@ class MainShell extends StatelessWidget {
               ? null
               : [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 16,
                       offset: const Offset(0, -4))
                 ],
@@ -90,7 +90,7 @@ class MainShell extends StatelessWidget {
                               horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
                             color: isActive
-                                ? primaryColor.withOpacity(0.12)
+                                ? primaryColor.withValues(alpha: 0.12)
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(AppRadius.chip),
                           ),

@@ -157,7 +157,7 @@ class AppTheme {
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
-              ? primary.withOpacity(0.5)
+              ? primary.withValues(alpha: 0.5)
               : divider,
         ),
       ),
