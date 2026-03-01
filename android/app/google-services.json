@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "581782270698",
+    "project_id": "expense-care-2ef8d",
+    "storage_bucket": "expense-care-2ef8d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:581782270698:android:c232e03ec17d03a9af9d93",
+        "android_client_info": {
+          "package_name": "com.example.expense_care"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "581782270698-p2aep4ueftblk0cfff1u0uja1j4ljqbf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOPLtdwnRp0l3aGQc5b8UwqQhwKR7-KOc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "581782270698-p2aep4ueftblk0cfff1u0uja1j4ljqbf.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "581782270698-aktq766u6or1s3kjvnnm7te19vmpban6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.expenseCare"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

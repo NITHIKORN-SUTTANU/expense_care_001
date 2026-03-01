@@ -1,99 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../expense/domain/models/expense_model.dart';
+import '../../../../shared/providers/user_preferences_provider.dart';
+import '../../../../shared/widgets/app_bottom_sheet.dart';
+import '../../../expense/data/expense_repository.dart';
+import '../../../expense/presentation/screens/add_expense_screen.dart';
+import '../../../profile/presentation/widgets/budget_limit_form.dart';
 import '../widgets/daily_budget_card.dart';
 import '../widgets/optional_budget_cards.dart';
 import '../widgets/recent_expenses_list.dart';
 import '../widgets/quick_add_fab.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  // ── Mock data (replace with Riverpod providers in production) ───────────
-  static const double _dailySpent = 53.24;
-  static const double _dailyBudget = 80.00;
-  static const double _weeklySpent = 213.50;
-  static const double _weeklyBudget = 400.00;
-  static const double _monthlySpent = 642.00;
-  static const double _monthlyBudget = 1200.00;
-  static const bool _showWeekly = true;
-  static const bool _showMonthly = true;
-
-  final List<ExpenseModel> _recentExpenses = _buildMockExpenses();
-
-  static List<ExpenseModel> _buildMockExpenses() {
-    final now = DateTime.now();
-    return [
-      ExpenseModel(
-        id: '1',
-        userId: 'u1',
-        amount: 4.50,
-        currency: 'USD',
-        amountInBaseCurrency: 4.50,
-        categoryId: 'food',
-        note: 'Morning Coffee',
-        date: now.subtract(const Duration(hours: 2)),
-        syncedToFirestore: true,
-        createdAt: now.subtract(const Duration(hours: 2)),
-      ),
-      ExpenseModel(
-        id: '2',
-        userId: 'u1',
-        amount: 12.00,
-        currency: 'USD',
-        amountInBaseCurrency: 12.00,
-        categoryId: 'transport',
-        note: 'Grab to office',
-        date: now.subtract(const Duration(hours: 5)),
-        syncedToFirestore: true,
-        createdAt: now.subtract(const Duration(hours: 5)),
-      ),
-      ExpenseModel(
-        id: '3',
-        userId: 'u1',
-        amount: 8.75,
-        currency: 'USD',
-        amountInBaseCurrency: 8.75,
-        categoryId: 'food',
-        note: 'Lunch',
-        date: now.subtract(const Duration(hours: 6)),
-        syncedToFirestore: true,
-        createdAt: now.subtract(const Duration(hours: 6)),
-      ),
-      ExpenseModel(
-        id: '4',
-        userId: 'u1',
-        amount: 34.99,
-        currency: 'USD',
-        amountInBaseCurrency: 34.99,
-        categoryId: 'shopping',
-        note: 'Amazon order',
-        date: now.subtract(const Duration(days: 1)),
-        syncedToFirestore: false,
-        createdAt: now.subtract(const Duration(days: 1)),
-      ),
-      ExpenseModel(
-        id: '5',
-        userId: 'u1',
-        amount: 15.99,
-        currency: 'USD',
-        amountInBaseCurrency: 15.99,
-        categoryId: 'entertainment',
-        note: 'Netflix',
-        date: now.subtract(const Duration(days: 2)),
-        syncedToFirestore: true,
-        createdAt: now.subtract(const Duration(days: 2)),
-      ),
-    ];
-  }
 
   String get _greeting {
     final hour = DateTime.now().hour;
@@ -112,30 +35,57 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
   }
 
-  void _onAddExpense() {
+  void _openAddExpense(BuildContext context) {
+    showAppBottomSheet(
+      context: context,
+      title: 'Add Expense',
+      child: const AddExpenseScreen(),
+    );
+  }
+
+  void _openBudgetSetup(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AddExpensePlaceholder(),
+      builder: (_) => _BudgetSetupSheet(ref: ref),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final user = ref.watch(userPreferencesNotifierProvider);
+    final dailySpent = ref.watch(dailyTotalProvider).valueOrNull ?? 0.0;
+    final weeklySpent = ref.watch(weeklyTotalProvider).valueOrNull ?? 0.0;
+    final monthlySpent = ref.watch(monthlyTotalProvider).valueOrNull ?? 0.0;
+    final recentExpenses = ref.watch(recentExpensesProvider).valueOrNull ?? [];
+
+    final dailyBudget = user?.dailyLimit ?? 0.0;
+    final weeklyBudget = user?.weeklyLimit ?? 0.0;
+    final monthlyBudget = user?.monthlyLimit ?? 0.0;
+    final showWeekly = user?.showWeeklyOnHome ?? false;
+    final showMonthly = user?.showMonthlyOnHome ?? false;
+    final currency = user?.preferredCurrency ?? 'USD';
+    final firstName = user?.firstName ?? '';
+
+    // Still loading user prefs — show nothing yet
+    final budgetReady = dailyBudget > 0;
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          // ── App Bar ──────────────────────────────────────────────────────
+          // ── App Bar ──────────────────────────────────────────────────
           SliverAppBar(
             pinned: true,
             floating: false,
             expandedHeight: 0,
-            backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
-            systemOverlayStyle:
-                isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+            backgroundColor:
+                isDark ? AppColors.darkSurface : AppColors.surface,
+            systemOverlayStyle: isDark
+                ? SystemUiOverlayStyle.light
+                : SystemUiOverlayStyle.dark,
             titleSpacing: 20,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Text(
-                  '$_greeting, Alex',
+                  firstName.isEmpty ? _greeting : '$_greeting, $firstName',
                   style: AppTextStyles.titleLarge(
                     color: isDark
                         ? AppColors.darkOnBackground
@@ -178,50 +128,124 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // ── Content ──────────────────────────────────────────────────────
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              20,
-              AppSpacing.sm,
-              20,
-              AppSpacing.sm + 80, // bottom nav + extra space
+          // ── Content ──────────────────────────────────────────────────
+          if (!budgetReady)
+            SliverFillRemaining(
+              child: _BudgetSetupPrompt(
+                isDark: isDark,
+                onSetUp: () => _openBudgetSetup(context, ref),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                20,
+                AppSpacing.sm,
+                20,
+                AppSpacing.sm + 80,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  DailyBudgetCard(
+                    spent: dailySpent,
+                    budget: dailyBudget,
+                    currency: currency,
+                  ),
+
+                  const SizedBox(height: AppSpacing.xs),
+
+                  OptionalBudgetCards(
+                    weeklySpent: weeklySpent,
+                    weeklyBudget: weeklyBudget,
+                    monthlySpent: monthlySpent,
+                    monthlyBudget: monthlyBudget,
+                    showWeekly: showWeekly,
+                    showMonthly: showMonthly,
+                    currency: currency,
+                  ),
+
+                  const SizedBox(height: AppSpacing.sm),
+
+                  QuickAddFab(
+                    onPressed: () => _openAddExpense(context),
+                  ),
+
+                  const SizedBox(height: AppSpacing.md),
+
+                  RecentExpensesList(
+                    expenses: recentExpenses,
+                    onSeeAll: () {},
+                    onExpenseTap: (_) {},
+                  ),
+                ]),
+              ),
             ),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // Daily Budget Card
-                const DailyBudgetCard(
-                  spent: _dailySpent,
-                  budget: _dailyBudget,
-                  currency: 'USD',
+        ],
+      ),
+    );
+  }
+}
+
+// ── Budget setup prompt ───────────────────────────────────────────────────────
+
+class _BudgetSetupPrompt extends StatelessWidget {
+  const _BudgetSetupPrompt({
+    required this.isDark,
+    required this.onSetUp,
+  });
+
+  final bool isDark;
+  final VoidCallback onSetUp;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text('💰', style: TextStyle(fontSize: 64)),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Set your budget first',
+            style: AppTextStyles.titleLarge(
+              color: isDark
+                  ? AppColors.darkOnBackground
+                  : AppColors.onBackground,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Before tracking expenses, set a daily budget limit so we can help you stay on track.',
+            style: AppTextStyles.bodyMedium(
+              color: isDark ? AppColors.darkMuted : AppColors.muted,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: onSetUp,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.button),
                 ),
-
-                const SizedBox(height: AppSpacing.xs),
-
-                // Weekly / Monthly cards
-                const OptionalBudgetCards(
-                  weeklySpent: _weeklySpent,
-                  weeklyBudget: _weeklyBudget,
-                  monthlySpent: _monthlySpent,
-                  monthlyBudget: _monthlyBudget,
-                  showWeekly: _showWeekly,
-                  showMonthly: _showMonthly,
-                  currency: 'USD',
+              ),
+              child: Text(
+                'Set Up Budget',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
                 ),
-
-                const SizedBox(height: AppSpacing.sm),
-
-                // Quick Add Button
-                QuickAddFab(onPressed: _onAddExpense),
-
-                const SizedBox(height: AppSpacing.md),
-
-                // Recent Expenses
-                RecentExpensesList(
-                  expenses: _recentExpenses,
-                  onSeeAll: () {},
-                  onExpenseTap: (expense) {},
-                ),
-              ]),
+              ),
             ),
           ),
         ],
@@ -230,43 +254,86 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ── Placeholder bottom sheet for Add Expense ──────────────────────────────────
-class _AddExpensePlaceholder extends StatelessWidget {
+// ── Budget setup bottom sheet ─────────────────────────────────────────────────
+
+class _BudgetSetupSheet extends StatelessWidget {
+  const _BudgetSetupSheet({required this.ref});
+  final WidgetRef ref;
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final user = ref.read(userPreferencesNotifierProvider);
+
     return Container(
-      height: MediaQuery.of(context).size.height * 0.9,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.88,
+      ),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.surface,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(AppRadius.bottomSheetTop),
         ),
       ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkDivider : AppColors.divider,
-              borderRadius: BorderRadius.circular(2),
+          // Drag handle
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(
+                  top: AppSpacing.xs, bottom: AppSpacing.xs),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkDivider : AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Add Expense',
-            style: AppTextStyles.titleLarge(
-              color:
-                  isDark ? AppColors.darkOnBackground : AppColors.onBackground,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
+            child: Text(
+              'Set Up Your Budget',
+              style: AppTextStyles.titleLarge(
+                color: isDark
+                    ? AppColors.darkOnBackground
+                    : AppColors.onBackground,
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            '(Full Add Expense screen coming in next increment)',
-            style: AppTextStyles.bodyMedium(
-              color: isDark ? AppColors.darkMuted : AppColors.muted,
+          Flexible(
+            child: SingleChildScrollView(
+              child: BudgetLimitForm(
+                dailyLimit: user?.dailyLimit ?? 0.0,
+                weeklyLimit: user?.weeklyLimit,
+                monthlyLimit: user?.monthlyLimit,
+                showWeekly: user?.showWeeklyOnHome ?? false,
+                showMonthly: user?.showMonthlyOnHome ?? false,
+                onSave: ({
+                  required double daily,
+                  double? weekly,
+                  double? monthly,
+                  required bool showWeekly,
+                  required bool showMonthly,
+                }) async {
+                  await ref
+                      .read(userPreferencesNotifierProvider.notifier)
+                      .updateLimits(
+                        dailyLimit: daily,
+                        weeklyLimit: weekly,
+                        monthlyLimit: monthly,
+                        showWeeklyOnHome: showWeekly,
+                        showMonthlyOnHome: showMonthly,
+                      );
+                  if (context.mounted) Navigator.pop(context);
+                },
+              ),
             ),
           ),
         ],
