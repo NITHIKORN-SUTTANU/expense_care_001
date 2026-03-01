@@ -12,6 +12,7 @@ import '../../../../shared/widgets/error_snackbar.dart';
 import '../../data/expense_repository.dart';
 import '../../domain/models/expense_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../shared/providers/user_preferences_provider.dart';
 import '../widgets/category_selector.dart';
 
 class AddExpenseScreen extends ConsumerStatefulWidget {
@@ -74,6 +75,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final uid = ref.read(authStateProvider).valueOrNull?.uid;
     if (uid == null) return;
 
+    final currency =
+        ref.read(userPreferencesNotifierProvider)?.preferredCurrency ?? 'USD';
     final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '')) ?? 0;
 
     setState(() => _isLoading = true);
@@ -82,7 +85,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         userId: uid,
         amount: amount,
-        currency: 'USD',
+        currency: currency,
         amountInBaseCurrency: amount,
         categoryId: _selectedCategoryId!,
         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
@@ -107,6 +110,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? AppColors.darkMuted : AppColors.muted;
     final divColor = isDark ? AppColors.darkDivider : AppColors.divider;
+    final currency = ref.watch(userPreferencesNotifierProvider)?.preferredCurrency ?? 'USD';
+    final currencySymbol = NumberFormat.simpleCurrency(name: currency).currencySymbol;
 
     return Form(
       key: _formKey,
@@ -134,7 +139,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               hint: '0.00',
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
-              prefixText: '\$ ',
+              prefixText: '$currencySymbol ',
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
               ],

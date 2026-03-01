@@ -32,8 +32,8 @@ class DailyBudgetCard extends StatelessWidget {
   }
 
   String _formatCurrency(double amount) {
-    final formatter = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
-    return formatter.format(amount.abs());
+    return NumberFormat.simpleCurrency(name: currency, decimalDigits: 2)
+        .format(amount.abs());
   }
 
   @override
@@ -106,7 +106,9 @@ class DailyBudgetCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '${_pct.toStringAsFixed(0)}%',
+                  _isOverBudget
+                      ? 'Over limit'
+                      : '${_pct.clamp(0.0, 100.0).toStringAsFixed(0)}% used',
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
