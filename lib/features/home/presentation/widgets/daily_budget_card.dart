@@ -106,9 +106,7 @@ class DailyBudgetCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  _isOverBudget
-                      ? 'Over limit'
-                      : '${_pct.clamp(0.0, 100.0).toStringAsFixed(0)}% used',
+                  _isOverBudget ? 'Over limit' : '${_pct.floor()}% used',
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
