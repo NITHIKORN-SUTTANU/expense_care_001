@@ -16,7 +16,10 @@ import '../../../../shared/providers/user_preferences_provider.dart';
 import '../widgets/category_selector.dart';
 
 class AddExpenseScreen extends ConsumerStatefulWidget {
-  const AddExpenseScreen({super.key});
+  const AddExpenseScreen({super.key, this.expense});
+
+  /// When provided, the screen operates in edit mode.
+  final ExpenseModel? expense;
 
   @override
   ConsumerState<AddExpenseScreen> createState() => _AddExpenseScreenState();
@@ -30,6 +33,20 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   String? _selectedCategoryId;
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
+
+  bool get _isEditing => widget.expense != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.expense;
+    if (e != null) {
+      _amountCtrl.text = e.amount.toStringAsFixed(2);
+      _noteCtrl.text = e.note ?? '';
+      _selectedCategoryId = e.categoryId;
+      _selectedDate = e.date;
+    }
+  }
 
   @override
   void dispose() {
@@ -78,28 +95,89 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final currency =
         ref.read(userPreferencesNotifierProvider)?.preferredCurrency ?? 'USD';
     final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '')) ?? 0;
+    final note = _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim();
+    final repo = ref.read(expenseRepositoryProvider);
 
     setState(() => _isLoading = true);
     try {
-      final expense = ExpenseModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        userId: uid,
-        amount: amount,
-        currency: currency,
-        amountInBaseCurrency: amount,
-        categoryId: _selectedCategoryId!,
-        note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
-        date: _selectedDate,
-        syncedToFirestore: true,
-        createdAt: DateTime.now(),
-      );
-      await ref.read(expenseRepositoryProvider).add(expense);
+      if (_isEditing) {
+        final updated = widget.expense!.copyWith(
+          amount: amount,
+          amountInBaseCurrency: amount,
+          categoryId: _selectedCategoryId!,
+          note: note,
+          date: _selectedDate,
+        );
+        await repo.update(updated);
+        if (mounted) {
+          showSuccessSnackBar(context, 'Expense updated!');
+          Navigator.of(context).pop();
+        }
+      } else {
+        final expense = ExpenseModel(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          userId: uid,
+          amount: amount,
+          currency: currency,
+          amountInBaseCurrency: amount,
+          categoryId: _selectedCategoryId!,
+          note: note,
+          date: _selectedDate,
+          syncedToFirestore: true,
+          createdAt: DateTime.now(),
+        );
+        await repo.add(expense);
+        if (mounted) {
+          showSuccessSnackBar(context, 'Expense added!');
+          Navigator.of(context).pop();
+        }
+      }
+    } catch (e) {
       if (mounted) {
-        showSuccessSnackBar(context, 'Expense added!');
+        showErrorSnackBar(
+          context,
+          _isEditing ? 'Failed to update expense.' : 'Failed to save expense.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _delete() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete expense?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    final uid = ref.read(authStateProvider).valueOrNull?.uid;
+    if (uid == null) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await ref
+          .read(expenseRepositoryProvider)
+          .delete(uid, widget.expense!.id);
+      if (mounted) {
+        showSuccessSnackBar(context, 'Expense deleted.');
         Navigator.of(context).pop();
       }
     } catch (e) {
-      if (mounted) showErrorSnackBar(context, 'Failed to save expense.');
+      if (mounted) showErrorSnackBar(context, 'Failed to delete expense.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -229,8 +307,23 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             const SizedBox(height: AppSpacing.lg),
 
             // ── Submit ───────────────────────────────────────────────────
+            if (_isEditing) ...[
+              OutlinedButton(
+                onPressed: _isLoading ? null : _delete,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
+                child: const Text('Delete Expense'),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+            ],
             AppButton(
-              label: 'Add Expense',
+              label: _isEditing ? 'Save Changes' : 'Add Expense',
               onPressed: _canSubmit && !_isLoading ? _submit : null,
               isLoading: _isLoading,
             ),

@@ -131,3 +131,28 @@ final monthlyTotalProvider = StreamProvider<double>((ref) {
   if (uid == null) return Stream.value(0.0);
   return ref.read(expenseRepositoryProvider).watchMonthlyTotal(uid);
 });
+
+/// Watches all expenses within [range]. Used by the Summary screen.
+/// Keyed on [DateRangeKey] so Riverpod can compare parameters correctly.
+final expensesByDateRangeProvider =
+    StreamProvider.family<List<ExpenseModel>, DateRangeKey>((ref, key) {
+  final uid = ref.watch(authStateProvider).valueOrNull?.uid;
+  if (uid == null) return Stream.value([]);
+  return ref
+      .read(expenseRepositoryProvider)
+      .watchByDateRange(uid, key.start, key.end);
+});
+
+/// Equatable key for [expensesByDateRangeProvider].
+class DateRangeKey {
+  const DateRangeKey(this.start, this.end);
+  final DateTime start;
+  final DateTime end;
+
+  @override
+  bool operator ==(Object other) =>
+      other is DateRangeKey && other.start == start && other.end == end;
+
+  @override
+  int get hashCode => Object.hash(start, end);
+}

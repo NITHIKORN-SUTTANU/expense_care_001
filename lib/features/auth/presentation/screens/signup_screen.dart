@@ -63,9 +63,13 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   void _showError() {
     final msg = ref.read(authNotifierProvider.notifier).errorMessage ??
         'Something went wrong.';
+    _snack(msg, isError: true);
+  }
+
+  void _snack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
-      backgroundColor: AppColors.error,
+      backgroundColor: isError ? AppColors.error : AppColors.success,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       margin: const EdgeInsets.all(16),

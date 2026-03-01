@@ -7,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/validators.dart';
+import '../../../../shared/providers/user_preferences_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -36,12 +37,12 @@ final recurringProvider =
 class RecurringExpensesScreen extends ConsumerWidget {
   const RecurringExpensesScreen({super.key});
 
-  void _openAddSheet(BuildContext context, WidgetRef ref) {
+  void _openAddSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AddRecurringSheet(ref: ref),
+      builder: (_) => const _AddRecurringSheet(),
     );
   }
 
@@ -70,7 +71,7 @@ class RecurringExpensesScreen extends ConsumerWidget {
             actions: [
               IconButton(
                 icon: const Icon(Icons.add_rounded),
-                onPressed: () => _openAddSheet(context, ref),
+                onPressed: () => _openAddSheet(context),
                 tooltip: 'Add Recurring',
               ),
               const SizedBox(width: 4),
@@ -91,7 +92,7 @@ class RecurringExpensesScreen extends ConsumerWidget {
                 title: 'No recurring expenses',
                 subtitle: 'Set one up to automate your tracking.',
                 actionLabel: 'Add Recurring',
-                onAction: () => _openAddSheet(context, ref),
+                onAction: () => _openAddSheet(context),
               ),
             )
           else
@@ -262,7 +263,8 @@ class _RecurringCard extends StatelessWidget {
 
             // Amount
             Text(
-              '\$${item.amount.toStringAsFixed(item.amount.truncateToDouble() == item.amount ? 0 : 2)}',
+              NumberFormat.simpleCurrency(name: item.currency)
+                  .format(item.amount),
               style: AppTextStyles.labelLarge(
                 color: isDark ? AppColors.darkPrimary : AppColors.primary,
               ),
@@ -299,15 +301,14 @@ class _FrequencyBadge extends StatelessWidget {
 
 // ── Add Recurring bottom sheet ────────────────────────────────────────────────
 
-class _AddRecurringSheet extends StatefulWidget {
-  const _AddRecurringSheet({required this.ref});
-  final WidgetRef ref;
+class _AddRecurringSheet extends ConsumerStatefulWidget {
+  const _AddRecurringSheet();
 
   @override
-  State<_AddRecurringSheet> createState() => _AddRecurringSheetState();
+  ConsumerState<_AddRecurringSheet> createState() => _AddRecurringSheetState();
 }
 
-class _AddRecurringSheetState extends State<_AddRecurringSheet> {
+class _AddRecurringSheetState extends ConsumerState<_AddRecurringSheet> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _amountCtrl = TextEditingController();
@@ -354,8 +355,11 @@ class _AddRecurringSheetState extends State<_AddRecurringSheet> {
       return;
     }
 
-    final uid = widget.ref.read(authStateProvider).valueOrNull?.uid;
+    final uid = ref.read(authStateProvider).valueOrNull?.uid;
     if (uid == null) return;
+
+    final currency =
+        ref.read(userPreferencesNotifierProvider)?.preferredCurrency ?? 'USD';
 
     setState(() => _isSaving = true);
     try {
@@ -368,7 +372,7 @@ class _AddRecurringSheetState extends State<_AddRecurringSheet> {
         userId: uid,
         name: _nameCtrl.text.trim(),
         amount: amount,
-        currency: 'USD',
+        currency: currency,
         categoryId: _selectedCategoryId!,
         frequency: _frequency,
         startDate: _startDate,
@@ -402,6 +406,10 @@ class _AddRecurringSheetState extends State<_AddRecurringSheet> {
     final divColor = isDark ? AppColors.darkDivider : AppColors.divider;
     final muted = isDark ? AppColors.darkMuted : AppColors.muted;
     final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
+    final currency =
+        ref.watch(userPreferencesNotifierProvider)?.preferredCurrency ?? 'USD';
+    final currencySymbol =
+        NumberFormat.simpleCurrency(name: currency).currencySymbol;
 
     return Container(
       constraints: BoxConstraints(
@@ -465,7 +473,7 @@ class _AddRecurringSheetState extends State<_AddRecurringSheet> {
                 label: 'Amount',
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                prefixText: '\$ ',
+                prefixText: '$currencySymbol ',
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
                 ],

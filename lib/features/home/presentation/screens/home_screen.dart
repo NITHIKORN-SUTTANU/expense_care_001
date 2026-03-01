@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/user_preferences_provider.dart';
 import '../../../../shared/widgets/app_bottom_sheet.dart';
 import '../../../expense/data/expense_repository.dart';
+import '../../../expense/domain/models/expense_model.dart';
 import '../../../expense/presentation/screens/add_expense_screen.dart';
 import '../../../profile/presentation/widgets/budget_limit_form.dart';
 import '../widgets/daily_budget_card.dart';
 import '../widgets/optional_budget_cards.dart';
 import '../widgets/recent_expenses_list.dart';
-import '../widgets/quick_add_fab.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -40,6 +43,14 @@ class HomeScreen extends ConsumerWidget {
       context: context,
       title: 'Add Expense',
       child: const AddExpenseScreen(),
+    );
+  }
+
+  void _openEditExpense(BuildContext context, ExpenseModel expense) {
+    showAppBottomSheet(
+      context: context,
+      title: 'Edit Expense',
+      child: AddExpenseScreen(expense: expense),
     );
   }
 
@@ -70,10 +81,24 @@ class HomeScreen extends ConsumerWidget {
     final currency = user?.preferredCurrency ?? 'USD';
     final firstName = user?.firstName ?? '';
 
-    // Still loading user prefs — show nothing yet
-    final budgetReady = dailyBudget > 0;
+    // user == null  → Firestore not loaded yet (always logged in on this screen)
+    // user != null && dailyBudget == 0  → truly no budget set
+    final userLoaded = user != null;
+    final budgetReady = userLoaded && dailyBudget > 0;
+
+    final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
 
     return Scaffold(
+      floatingActionButton: budgetReady
+          ? FloatingActionButton.extended(
+              onPressed: () => _openAddExpense(context),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add Expense'),
+              backgroundColor: primary,
+              foregroundColor: Colors.white,
+              elevation: 2,
+            )
+          : null,
       body: CustomScrollView(
         slivers: [
           // ── App Bar ──────────────────────────────────────────────────
@@ -129,7 +154,11 @@ class HomeScreen extends ConsumerWidget {
           ),
 
           // ── Content ──────────────────────────────────────────────────
-          if (!budgetReady)
+          if (!userLoaded)
+            const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (!budgetReady)
             SliverFillRemaining(
               child: _BudgetSetupPrompt(
                 isDark: isDark,
@@ -164,18 +193,13 @@ class HomeScreen extends ConsumerWidget {
                     currency: currency,
                   ),
 
-                  const SizedBox(height: AppSpacing.sm),
-
-                  QuickAddFab(
-                    onPressed: () => _openAddExpense(context),
-                  ),
-
                   const SizedBox(height: AppSpacing.md),
 
                   RecentExpensesList(
                     expenses: recentExpenses,
-                    onSeeAll: () {},
-                    onExpenseTap: (_) {},
+                    onSeeAll: () => context.go(AppRoutes.summary),
+                    onExpenseTap: (expense) =>
+                        _openEditExpense(context, expense),
                   ),
                 ]),
               ),
@@ -264,6 +288,9 @@ class _BudgetSetupSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = ref.read(userPreferencesNotifierProvider);
+    final currency = user?.preferredCurrency ?? 'USD';
+    final currencySymbol =
+        NumberFormat.simpleCurrency(name: currency).currencySymbol;
 
     return Container(
       constraints: BoxConstraints(
@@ -315,6 +342,7 @@ class _BudgetSetupSheet extends StatelessWidget {
                 monthlyLimit: user?.monthlyLimit,
                 showWeekly: user?.showWeeklyOnHome ?? false,
                 showMonthly: user?.showMonthlyOnHome ?? false,
+                currencySymbol: currencySymbol,
                 onSave: ({
                   required double daily,
                   double? weekly,
