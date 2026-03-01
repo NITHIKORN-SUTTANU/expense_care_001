@@ -15,6 +15,7 @@ class BudgetLimitForm extends StatefulWidget {
     required this.showWeekly,
     required this.showMonthly,
     required this.onSave,
+    this.currencySymbol = '\$',
   });
 
   final double dailyLimit;
@@ -22,7 +23,8 @@ class BudgetLimitForm extends StatefulWidget {
   final double? monthlyLimit;
   final bool showWeekly;
   final bool showMonthly;
-  final void Function({
+  final String currencySymbol;
+  final Future<void> Function({
     required double daily,
     double? weekly,
     double? monthly,
@@ -74,14 +76,14 @@ class _BudgetLimitFormState extends State<BudgetLimitForm> {
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
-    await Future.delayed(const Duration(milliseconds: 600)); // simulate async
-    widget.onSave(
+    await widget.onSave(
       daily: double.parse(_dailyCtrl.text),
       weekly: _weeklyEnabled ? double.tryParse(_weeklyCtrl.text) : null,
       monthly: _monthlyEnabled ? double.tryParse(_monthlyCtrl.text) : null,
       showWeekly: _weeklyEnabled,
       showMonthly: _monthlyEnabled,
     );
+    if (!mounted) return;
     setState(() {
       _saving = false;
       _hasChanges = false;
@@ -126,6 +128,7 @@ class _BudgetLimitFormState extends State<BudgetLimitForm> {
             showToggle: false,
             validator: (v) => _validatePositive(v),
             isDark: isDark,
+            currencySymbol: widget.currencySymbol,
           ),
 
           Divider(height: 1, color: dividerColor),
@@ -144,6 +147,7 @@ class _BudgetLimitFormState extends State<BudgetLimitForm> {
             }),
             validator: _weeklyEnabled ? (v) => _validatePositive(v) : null,
             isDark: isDark,
+            currencySymbol: widget.currencySymbol,
           ),
 
           Divider(height: 1, color: dividerColor),
@@ -162,6 +166,7 @@ class _BudgetLimitFormState extends State<BudgetLimitForm> {
             }),
             validator: _monthlyEnabled ? (v) => _validatePositive(v) : null,
             isDark: isDark,
+            currencySymbol: widget.currencySymbol,
           ),
 
           Divider(height: 1, color: dividerColor),
@@ -205,6 +210,7 @@ class _LimitRow extends StatelessWidget {
     this.onToggle,
     this.validator,
     required this.isDark,
+    required this.currencySymbol,
   });
 
   final String label;
@@ -216,6 +222,7 @@ class _LimitRow extends StatelessWidget {
   final ValueChanged<bool>? onToggle;
   final FormFieldValidator<String>? validator;
   final bool isDark;
+  final String currencySymbol;
 
   @override
   Widget build(BuildContext context) {
@@ -276,7 +283,7 @@ class _LimitRow extends StatelessWidget {
                         : (isDark ? AppColors.darkMuted : AppColors.muted),
                   ),
                   decoration: InputDecoration(
-                    prefixText: '\$ ',
+                    prefixText: '$currencySymbol ',
                     prefixStyle: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: isDark ? AppColors.darkMuted : AppColors.muted,

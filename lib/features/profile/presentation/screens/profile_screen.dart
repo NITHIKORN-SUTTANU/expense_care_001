@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
@@ -22,8 +23,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _notificationsEnabled = true;
-
   Future<void> _handleSaveLimits({
     required double daily,
     double? weekly,
@@ -206,6 +205,43 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  void _handleEditName(String currentName) {
+    final ctrl = TextEditingController(text: currentName);
+    showDialog(
+      context: context,
+      useRootNavigator: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit Name'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(hintText: 'Display name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newName = ctrl.text.trim();
+              if (newName.isEmpty || newName == currentName) {
+                Navigator.pop(dialogContext);
+                return;
+              }
+              Navigator.pop(dialogContext);
+              await ref
+                  .read(authRepositoryProvider)
+                  .updateDisplayName(newName);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    ).then((_) => ctrl.dispose());
+  }
+
   void _handleSignOut() {
     showDialog(
       context: context,
@@ -253,7 +289,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await ref.read(authRepositoryProvider).deleteAccount();
+            },
             child: Text(
               'Delete',
               style: TextStyle(
@@ -281,6 +320,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final showWeekly = user?.showWeeklyOnHome ?? false;
     final showMonthly = user?.showMonthlyOnHome ?? false;
     final currency = user?.preferredCurrency ?? 'USD';
+    final currencySymbol =
+        NumberFormat.simpleCurrency(name: currency).currencySymbol;
 
     return Scaffold(
       body: CustomScrollView(
@@ -319,7 +360,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 // ── User Info ───────────────────────────────────────────
-                _UserInfoSection(isDark: isDark, user: user),
+                _UserInfoSection(
+                  isDark: isDark,
+                  user: user,
+                  onEdit: () =>
+                      _handleEditName(user?.displayName ?? ''),
+                ),
 
                 const SizedBox(height: AppSpacing.sm),
 
@@ -333,6 +379,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     monthlyLimit: monthlyLimit,
                     showWeekly: showWeekly,
                     showMonthly: showMonthly,
+                    currencySymbol: currencySymbol,
                     onSave: _handleSaveLimits,
                   ),
                 ),
@@ -447,9 +494,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     subtitle: 'Get notified at 80% and 100% of budget',
                     isDark: isDark,
                     trailing: Switch(
-                      value: _notificationsEnabled,
-                      onChanged: (val) =>
-                          setState(() => _notificationsEnabled = val),
+                      value: user?.notificationsEnabled ?? true,
+                      onChanged: (val) => ref
+                          .read(userPreferencesNotifierProvider.notifier)
+                          .updateNotifications(val),
                     ),
                     showDivider: false,
                   ),
@@ -537,16 +585,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 // ─── Sub-widgets ──────────────────────────────────────────────────────────────
 
 class _UserInfoSection extends StatelessWidget {
-  const _UserInfoSection({required this.isDark, this.user});
+  const _UserInfoSection({
+    required this.isDark,
+    this.user,
+    required this.onEdit,
+  });
   final bool isDark;
   final UserModel? user;
+  final VoidCallback onEdit;
+
+  static String _initials(String? name) {
+    if (name == null || name.trim().isEmpty) return '?';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
 
   @override
   Widget build(BuildContext context) {
     final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
-    final initials = (user?.displayName.isNotEmpty == true)
-        ? user!.displayName[0].toUpperCase()
-        : '?';
+    final initials = _initials(user?.displayName);
 
     return Row(
       children: [
@@ -595,7 +653,7 @@ class _UserInfoSection extends StatelessWidget {
 
         // Edit button
         OutlinedButton(
-          onPressed: () {},
+          onPressed: onEdit,
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(60, 36),
             padding: const EdgeInsets.symmetric(horizontal: 12),

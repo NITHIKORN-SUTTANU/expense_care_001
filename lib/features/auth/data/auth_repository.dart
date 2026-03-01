@@ -129,6 +129,24 @@ class AuthRepository {
         .update({...user.toMap(), 'updatedAt': DateTime.now().toIso8601String()});
   }
 
+  Future<void> updateDisplayName(String displayName) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    await user.updateDisplayName(displayName.trim());
+    await _firestore.collection('users').doc(user.uid).update({
+      'displayName': displayName.trim(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    final uid = user.uid;
+    await _firestore.collection('users').doc(uid).delete();
+    await user.delete();
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   Future<UserModel> _fetchOrCreateUser(User firebaseUser) async {

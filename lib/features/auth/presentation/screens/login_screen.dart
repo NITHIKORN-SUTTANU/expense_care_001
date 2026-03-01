@@ -23,6 +23,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
+  bool _forgotLoading = false;
 
   @override
   void dispose() {
@@ -55,6 +56,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _snack('Enter your email address first.', isError: true);
       return;
     }
+    setState(() => _forgotLoading = true);
     try {
       await ref
           .read(authRepositoryProvider)
@@ -62,6 +64,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) _snack('Password reset email sent.');
     } catch (_) {
       if (mounted) _snack('Could not send reset email.', isError: true);
+    } finally {
+      if (mounted) setState(() => _forgotLoading = false);
     }
   }
 
@@ -179,11 +183,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: _forgotPassword,
-                    child: Text(
-                      'Forgot Password?',
-                      style: AppTextStyles.labelLarge(color: primary),
-                    ),
+                    onPressed: _forgotLoading ? null : _forgotPassword,
+                    child: _forgotLoading
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: primary,
+                            ),
+                          )
+                        : Text(
+                            'Forgot Password?',
+                            style: AppTextStyles.labelLarge(color: primary),
+                          ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),

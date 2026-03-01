@@ -12,10 +12,10 @@ class Validators {
     if (value == null || value.isEmpty) return 'Password is required';
     if (value.length < 8) return 'Password must be at least 8 characters';
     if (!RegExp(r'[A-Z]').hasMatch(value)) {
-      return 'Password must contain at least one uppercase letter';
+      return 'Password must include at least one uppercase letter';
     }
     if (!RegExp(r'[0-9]').hasMatch(value)) {
-      return 'Password must contain at least one number';
+      return 'Password must include at least one number';
     }
     return null;
   }
@@ -30,6 +30,10 @@ class Validators {
     if (value == null || value.trim().isEmpty) return 'Full name is required';
     if (value.trim().length < 2) return 'Name must be at least 2 characters';
     if (value.trim().length > 60) return 'Name must be at most 60 characters';
+    if (RegExp(r'[0-9]').hasMatch(value)) return 'Name cannot contain numbers';
+    if (RegExp(r'[!@#\$%^&*()_+=\[\]{};:"\\|<>?/~`]').hasMatch(value)) {
+      return 'Name cannot contain special characters';
+    }
     return null;
   }
 

@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/validators.dart';
+import '../../../../shared/providers/user_preferences_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -32,13 +34,33 @@ final goalsProvider = StreamProvider<List<GoalModel>>((ref) {
 class GoalsScreen extends ConsumerWidget {
   const GoalsScreen({super.key});
 
-  void _openAddGoal(BuildContext context, WidgetRef ref) {
+  void _openAddGoal(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AddGoalSheet(ref: ref),
+      builder: (_) => const _AddGoalSheet(),
     );
+  }
+
+  void _openAddMoney(BuildContext context, GoalModel goal) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AddMoneySheet(goal: goal),
+    );
+  }
+
+  Future<void> _deleteGoal(WidgetRef ref, GoalModel goal) async {
+    final uid = ref.read(authStateProvider).valueOrNull?.uid;
+    if (uid == null) return;
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('goals')
+        .doc(goal.id)
+        .delete();
   }
 
   @override
@@ -66,7 +88,7 @@ class GoalsScreen extends ConsumerWidget {
             actions: [
               IconButton(
                 icon: const Icon(Icons.add_rounded),
-                onPressed: () => _openAddGoal(context, ref),
+                onPressed: () => _openAddGoal(context),
                 tooltip: 'Add Goal',
               ),
               const SizedBox(width: 4),
@@ -87,12 +109,13 @@ class GoalsScreen extends ConsumerWidget {
                 title: 'No goals yet',
                 subtitle: 'Set your first goal and start saving!',
                 actionLabel: 'Add Goal',
-                onAction: () => _openAddGoal(context, ref),
+                onAction: () => _openAddGoal(context),
               ),
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, AppSpacing.sm, 20, AppSpacing.sm + 80),
+              padding: const EdgeInsets.fromLTRB(
+                  20, AppSpacing.sm, 20, AppSpacing.sm + 80),
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
@@ -104,7 +127,8 @@ class GoalsScreen extends ConsumerWidget {
                   (context, i) => _GoalCard(
                     goal: goals[i],
                     isDark: isDark,
-                    onAddMoney: () => _openAddMoney(context, ref, goals[i]),
+                    onAddMoney: () => _openAddMoney(context, goals[i]),
+                    onDelete: () => _deleteGoal(ref, goals[i]),
                   ),
                   childCount: goals.length,
                 ),
@@ -112,15 +136,6 @@ class GoalsScreen extends ConsumerWidget {
             ),
         ],
       ),
-    );
-  }
-
-  void _openAddMoney(BuildContext context, WidgetRef ref, GoalModel goal) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _AddMoneySheet(goal: goal, ref: ref),
     );
   }
 }
@@ -132,13 +147,17 @@ class _GoalCard extends StatelessWidget {
     required this.goal,
     required this.isDark,
     required this.onAddMoney,
+    required this.onDelete,
   });
+
   final GoalModel goal;
   final bool isDark;
   final VoidCallback onAddMoney;
+  final VoidCallback onDelete;
 
   String _fmt(double v) =>
-      '\$${v.toStringAsFixed(v.truncateToDouble() == v ? 0 : 2)}';
+      NumberFormat.simpleCurrency(name: goal.currency, decimalDigits: 2)
+          .format(v);
 
   @override
   Widget build(BuildContext context) {
@@ -149,96 +168,141 @@ class _GoalCard extends StatelessWidget {
     final surfaceColor = isDark ? AppColors.darkSurface : AppColors.surface;
     final pctLabel = '${goal.progressPercent}%';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: borderColor),
+    return Dismissible(
+      key: ValueKey(goal.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: (isDark ? AppColors.darkError : AppColors.error)
+              .withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(AppRadius.card),
+        ),
+        child: Icon(
+          Icons.delete_outline_rounded,
+          color: isDark ? AppColors.darkError : AppColors.error,
+        ),
       ),
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Circular progress + emoji
-          SizedBox(
-            width: 72,
-            height: 72,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: goal.progress,
-                  strokeWidth: 5,
-                  backgroundColor: borderColor,
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
-                ),
-                Text(goal.emoji, style: const TextStyle(fontSize: 26)),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.xs),
-
-          Text(
-            goal.name,
-            style: AppTextStyles.labelLarge(
-              color: isDark ? AppColors.darkOnBackground : AppColors.onBackground,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-
-          const SizedBox(height: 2),
-
-          Text(
-            '${_fmt(goal.savedAmount)} of ${_fmt(goal.targetAmount)}',
-            style: AppTextStyles.labelSmall(
-              color: isDark ? AppColors.darkMuted : AppColors.muted,
-            ),
-            textAlign: TextAlign.center,
-          ),
-
-          const Spacer(),
-
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: LinearProgressIndicator(
-              value: goal.progress,
-              backgroundColor: borderColor,
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-              minHeight: 6,
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.xs),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                goal.isCompleted ? '🎉 Done' : pctLabel,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
+      confirmDismiss: (_) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Delete Goal'),
+            content: Text('Remove "${goal.name}" from your goals?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
               ),
-              if (!goal.isCompleted)
-                GestureDetector(
-                  onTap: onAddMoney,
-                  child: Text(
-                    'Add +',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: secondary,
-                    ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(
+                  'Delete',
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkError : AppColors.error,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
+              ),
             ],
           ),
-        ],
+        );
+      },
+      onDismissed: (_) => onDelete(),
+      child: Container(
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: borderColor),
+        ),
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Circular progress + emoji
+            SizedBox(
+              width: 72,
+              height: 72,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    value: goal.progress,
+                    strokeWidth: 5,
+                    backgroundColor: borderColor,
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+                  Text(goal.emoji, style: const TextStyle(fontSize: 26)),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: AppSpacing.xs),
+
+            Text(
+              goal.name,
+              style: AppTextStyles.labelLarge(
+                color: isDark
+                    ? AppColors.darkOnBackground
+                    : AppColors.onBackground,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+
+            const SizedBox(height: 2),
+
+            Text(
+              '${_fmt(goal.savedAmount)} of ${_fmt(goal.targetAmount)}',
+              style: AppTextStyles.labelSmall(
+                color: isDark ? AppColors.darkMuted : AppColors.muted,
+              ),
+              textAlign: TextAlign.center,
+            ),
+
+            const Spacer(),
+
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                value: goal.progress,
+                backgroundColor: borderColor,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+                minHeight: 6,
+              ),
+            ),
+
+            const SizedBox(height: AppSpacing.xs),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  goal.isCompleted ? '🎉 Done' : pctLabel,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+                if (!goal.isCompleted)
+                  GestureDetector(
+                    onTap: onAddMoney,
+                    child: Text(
+                      'Add +',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: secondary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -246,22 +310,23 @@ class _GoalCard extends StatelessWidget {
 
 // ── Add Goal bottom sheet ─────────────────────────────────────────────────────
 
-class _AddGoalSheet extends StatefulWidget {
-  const _AddGoalSheet({required this.ref});
-  final WidgetRef ref;
+class _AddGoalSheet extends ConsumerStatefulWidget {
+  const _AddGoalSheet();
 
   @override
-  State<_AddGoalSheet> createState() => _AddGoalSheetState();
+  ConsumerState<_AddGoalSheet> createState() => _AddGoalSheetState();
 }
 
-class _AddGoalSheetState extends State<_AddGoalSheet> {
+class _AddGoalSheetState extends ConsumerState<_AddGoalSheet> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _targetCtrl = TextEditingController();
   String _emoji = '🎯';
   bool _isSaving = false;
 
-  static const _emojis = ['🎯', '🏠', '✈️', '💻', '🚗', '📱', '🎓', '💎', '🛡️', '🎮', '📷', '🌴'];
+  static const _emojis = [
+    '🎯', '🏠', '✈️', '💻', '🚗', '📱', '🎓', '💎', '🛡️', '🎮', '📷', '🌴',
+  ];
 
   @override
   void dispose() {
@@ -272,8 +337,11 @@ class _AddGoalSheetState extends State<_AddGoalSheet> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    final uid = widget.ref.read(authStateProvider).valueOrNull?.uid;
+    final uid = ref.read(authStateProvider).valueOrNull?.uid;
     if (uid == null) return;
+
+    final currency =
+        ref.read(userPreferencesNotifierProvider)?.preferredCurrency ?? 'USD';
 
     setState(() => _isSaving = true);
     try {
@@ -285,7 +353,7 @@ class _AddGoalSheetState extends State<_AddGoalSheet> {
         emoji: _emoji,
         targetAmount: double.parse(_targetCtrl.text.replaceAll(',', '')),
         savedAmount: 0,
-        currency: 'USD',
+        currency: currency,
         createdAt: now,
         updatedAt: now,
       );
@@ -310,6 +378,10 @@ class _AddGoalSheetState extends State<_AddGoalSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currency =
+        ref.watch(userPreferencesNotifierProvider)?.preferredCurrency ?? 'USD';
+    final currencySymbol =
+        NumberFormat.simpleCurrency(name: currency).currencySymbol;
 
     return Container(
       constraints: BoxConstraints(
@@ -348,15 +420,22 @@ class _AddGoalSheetState extends State<_AddGoalSheet> {
             Text(
               'New Goal',
               style: AppTextStyles.titleLarge(
-                color: isDark ? AppColors.darkOnBackground : AppColors.onBackground,
+                color: isDark
+                    ? AppColors.darkOnBackground
+                    : AppColors.onBackground,
               ),
             ),
             const SizedBox(height: AppSpacing.md),
 
             // Emoji picker
-            Text('Pick an emoji', style: AppTextStyles.labelLarge(
-              color: isDark ? AppColors.darkOnBackground : AppColors.onBackground,
-            )),
+            Text(
+              'Pick an emoji',
+              style: AppTextStyles.labelLarge(
+                color: isDark
+                    ? AppColors.darkOnBackground
+                    : AppColors.onBackground,
+              ),
+            ),
             const SizedBox(height: AppSpacing.xxs),
             SizedBox(
               height: 48,
@@ -367,6 +446,8 @@ class _AddGoalSheetState extends State<_AddGoalSheet> {
                 itemBuilder: (_, i) {
                   final e = _emojis[i];
                   final selected = e == _emoji;
+                  final primary =
+                      isDark ? AppColors.darkPrimary : AppColors.primary;
                   return GestureDetector(
                     onTap: () => setState(() => _emoji = e),
                     child: AnimatedContainer(
@@ -375,17 +456,20 @@ class _AddGoalSheetState extends State<_AddGoalSheet> {
                       height: 44,
                       decoration: BoxDecoration(
                         color: selected
-                            ? (isDark ? AppColors.darkPrimary : AppColors.primary).withValues(alpha: 0.15)
+                            ? primary.withValues(alpha: 0.15)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: selected
-                              ? (isDark ? AppColors.darkPrimary : AppColors.primary)
-                              : (isDark ? AppColors.darkDivider : AppColors.divider),
+                              ? primary
+                              : (isDark
+                                  ? AppColors.darkDivider
+                                  : AppColors.divider),
                         ),
                       ),
                       child: Center(
-                        child: Text(e, style: const TextStyle(fontSize: 22)),
+                        child: Text(e,
+                            style: const TextStyle(fontSize: 22)),
                       ),
                     ),
                   );
@@ -406,10 +490,14 @@ class _AddGoalSheetState extends State<_AddGoalSheet> {
             AppTextField(
               controller: _targetCtrl,
               label: 'Target Amount',
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              prefixText: '\$ ',
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
-              validator: (v) => Validators.requiredPositiveNumber(v, label: 'Target amount'),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              prefixText: '$currencySymbol ',
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))
+              ],
+              validator: (v) =>
+                  Validators.requiredPositiveNumber(v, label: 'Target amount'),
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => _save(),
             ),
@@ -429,16 +517,16 @@ class _AddGoalSheetState extends State<_AddGoalSheet> {
 
 // ── Add Money bottom sheet ────────────────────────────────────────────────────
 
-class _AddMoneySheet extends StatefulWidget {
-  const _AddMoneySheet({required this.goal, required this.ref});
+class _AddMoneySheet extends ConsumerStatefulWidget {
+  const _AddMoneySheet({required this.goal});
   final GoalModel goal;
-  final WidgetRef ref;
 
   @override
-  State<_AddMoneySheet> createState() => _AddMoneySheetState();
+  ConsumerState<_AddMoneySheet> createState() => _AddMoneySheetState();
 }
 
-class _AddMoneySheetState extends State<_AddMoneySheet> {
+class _AddMoneySheetState extends ConsumerState<_AddMoneySheet> {
+  final _formKey = GlobalKey<FormState>();
   final _amountCtrl = TextEditingController();
   bool _isSaving = false;
 
@@ -449,10 +537,12 @@ class _AddMoneySheetState extends State<_AddMoneySheet> {
   }
 
   Future<void> _confirm() async {
+    if (!_formKey.currentState!.validate()) return;
+
     final amount = double.tryParse(_amountCtrl.text.replaceAll(',', ''));
     if (amount == null || amount <= 0) return;
 
-    final uid = widget.ref.read(authStateProvider).valueOrNull?.uid;
+    final uid = ref.read(authStateProvider).valueOrNull?.uid;
     if (uid == null) return;
 
     setState(() => _isSaving = true);
@@ -484,6 +574,8 @@ class _AddMoneySheetState extends State<_AddMoneySheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currencySymbol =
+        NumberFormat.simpleCurrency(name: widget.goal.currency).currencySymbol;
 
     return Container(
       decoration: BoxDecoration(
@@ -498,44 +590,54 @@ class _AddMoneySheetState extends State<_AddMoneySheet> {
         top: AppSpacing.xs,
         bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkDivider : AppColors.divider,
-                borderRadius: BorderRadius.circular(2),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkDivider : AppColors.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-          Text(
-            'Add to "${widget.goal.name}"',
-            style: AppTextStyles.titleLarge(
-              color: isDark ? AppColors.darkOnBackground : AppColors.onBackground,
+            Text(
+              'Add to "${widget.goal.name}"',
+              style: AppTextStyles.titleLarge(
+                color: isDark
+                    ? AppColors.darkOnBackground
+                    : AppColors.onBackground,
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          AppTextField(
-            controller: _amountCtrl,
-            label: 'Amount',
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            prefixText: '\$ ',
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
-            textInputAction: TextInputAction.done,
-            onFieldSubmitted: (_) => _confirm(),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          AppButton(
-            label: 'Confirm',
-            onPressed: _isSaving ? null : _confirm,
-            isLoading: _isSaving,
-          ),
-        ],
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              controller: _amountCtrl,
+              label: 'Amount',
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              prefixText: '$currencySymbol ',
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))
+              ],
+              validator: (v) =>
+                  Validators.requiredPositiveNumber(v, label: 'Amount'),
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _confirm(),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppButton(
+              label: 'Confirm',
+              onPressed: _isSaving ? null : _confirm,
+              isLoading: _isSaving,
+            ),
+          ],
+        ),
       ),
     );
   }
