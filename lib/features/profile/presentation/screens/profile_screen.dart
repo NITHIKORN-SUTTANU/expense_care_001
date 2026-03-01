@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/theme_notifier.dart';
+import '../../../../shared/providers/user_preferences_provider.dart';
 import '../../../../shared/widgets/app_card.dart';
+import '../../../auth/domain/models/user_model.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../widgets/budget_limit_form.dart';
 import '../widgets/theme_toggle.dart';
 
@@ -17,51 +22,46 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  // ── Mock state (replace with Riverpod providers) ─────────────────────────
-  double _dailyLimit = 80.00;
-  double? _weeklyLimit = 400.00;
-  double? _monthlyLimit = 1200.00;
-  bool _showWeekly = true;
-  bool _showMonthly = true;
   bool _notificationsEnabled = true;
-  final String _currency = 'USD';
 
-  void _handleSaveLimits({
+  Future<void> _handleSaveLimits({
     required double daily,
     double? weekly,
     double? monthly,
     required bool showWeekly,
     required bool showMonthly,
-  }) {
-    setState(() {
-      _dailyLimit = daily;
-      _weeklyLimit = weekly;
-      _monthlyLimit = monthly;
-      _showWeekly = showWeekly;
-      _showMonthly = showMonthly;
-    });
+  }) async {
+    await ref.read(userPreferencesNotifierProvider.notifier).updateLimits(
+          dailyLimit: daily,
+          weeklyLimit: weekly,
+          monthlyLimit: monthly,
+          showWeeklyOnHome: showWeekly,
+          showMonthlyOnHome: showMonthly,
+        );
   }
 
   void _handleSignOut() {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      useRootNavigator: false,
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Sign Out'),
         content: const Text('Are you sure you want to sign out?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: FirebaseAuth.instance.signOut()
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await Future.delayed(Duration.zero);
+              ref.read(authNotifierProvider.notifier).signOut();
             },
             child: Text(
               'Sign Out',
               style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark
+                color: Theme.of(dialogContext).brightness == Brightness.dark
                     ? AppColors.darkError
                     : AppColors.error,
               ),
@@ -75,22 +75,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void _handleDeleteAccount() {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      useRootNavigator: false,
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Account'),
         content: const Text(
           'This will permanently delete your account and all data. This action cannot be undone.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(
               'Delete',
               style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark
+                color: Theme.of(dialogContext).brightness == Brightness.dark
                     ? AppColors.darkError
                     : AppColors.error,
                 fontWeight: FontWeight.w700,
@@ -106,6 +107,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final user = ref.watch(userPreferencesNotifierProvider);
+
+    final dailyLimit = user?.dailyLimit ?? 0.0;
+    final weeklyLimit = user?.weeklyLimit;
+    final monthlyLimit = user?.monthlyLimit;
+    final showWeekly = user?.showWeeklyOnHome ?? false;
+    final showMonthly = user?.showMonthlyOnHome ?? false;
+    final currency = user?.preferredCurrency ?? 'USD';
 
     return Scaffold(
       body: CustomScrollView(
@@ -144,7 +153,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 // ── User Info ───────────────────────────────────────────
-                _UserInfoSection(isDark: isDark),
+                _UserInfoSection(isDark: isDark, user: user),
 
                 const SizedBox(height: AppSpacing.sm),
 
@@ -153,11 +162,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 AppCard(
                   padding: EdgeInsets.zero,
                   child: BudgetLimitForm(
-                    dailyLimit: _dailyLimit,
-                    weeklyLimit: _weeklyLimit,
-                    monthlyLimit: _monthlyLimit,
-                    showWeekly: _showWeekly,
-                    showMonthly: _showMonthly,
+                    dailyLimit: dailyLimit,
+                    weeklyLimit: weeklyLimit,
+                    monthlyLimit: monthlyLimit,
+                    showWeekly: showWeekly,
+                    showMonthly: showMonthly,
                     onSave: _handleSaveLimits,
                   ),
                 ),
@@ -178,7 +187,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              _currency,
+                              currency,
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -197,9 +206,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             ),
                           ],
                         ),
-                        onTap: () {
-                          // TODO: open currency picker modal
-                        },
+                        onTap: () {},
                         showDivider: true,
                       ),
 
@@ -227,8 +234,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         label: 'Show Weekly Budget on Home',
                         isDark: isDark,
                         trailing: Switch(
-                          value: _showWeekly,
-                          onChanged: (val) => setState(() => _showWeekly = val),
+                          value: showWeekly,
+                          onChanged: (val) => ref
+                              .read(userPreferencesNotifierProvider.notifier)
+                              .updateLimits(
+                                dailyLimit: dailyLimit,
+                                weeklyLimit: weeklyLimit,
+                                monthlyLimit: monthlyLimit,
+                                showWeeklyOnHome: val,
+                                showMonthlyOnHome: showMonthly,
+                              ),
                         ),
                         showDivider: true,
                       ),
@@ -238,9 +253,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         label: 'Show Monthly Budget on Home',
                         isDark: isDark,
                         trailing: Switch(
-                          value: _showMonthly,
-                          onChanged: (val) =>
-                              setState(() => _showMonthly = val),
+                          value: showMonthly,
+                          onChanged: (val) => ref
+                              .read(userPreferencesNotifierProvider.notifier)
+                              .updateLimits(
+                                dailyLimit: dailyLimit,
+                                weeklyLimit: weeklyLimit,
+                                monthlyLimit: monthlyLimit,
+                                showWeeklyOnHome: showWeekly,
+                                showMonthlyOnHome: val,
+                              ),
                         ),
                         showDivider: false,
                       ),
@@ -284,9 +306,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           Icons.chevron_right_rounded,
                           color: isDark ? AppColors.darkMuted : AppColors.muted,
                         ),
-                        onTap: () {
-                          // TODO: context.push(AppRoutes.profileRecurring)
-                        },
+                        onTap: () => context.push(AppRoutes.profileRecurring),
                         showDivider: true,
                       ),
                       _ListTile(
@@ -351,26 +371,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 // ─── Sub-widgets ──────────────────────────────────────────────────────────────
 
 class _UserInfoSection extends StatelessWidget {
-  const _UserInfoSection({required this.isDark});
+  const _UserInfoSection({required this.isDark, this.user});
   final bool isDark;
+  final UserModel? user;
 
   @override
   Widget build(BuildContext context) {
     final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
+    final initials = (user?.displayName.isNotEmpty == true)
+        ? user!.displayName[0].toUpperCase()
+        : '?';
 
     return Row(
       children: [
-        // Avatar — circular, flat, single-color
+        // Avatar
         Container(
           width: 72,
           height: 72,
-          decoration: BoxDecoration(
-            color: primary,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: primary, shape: BoxShape.circle),
           child: Center(
             child: Text(
-              'A',
+              initials,
               style: GoogleFonts.poppins(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
@@ -388,7 +409,7 @@ class _UserInfoSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Alex Johnson',
+                user?.displayName ?? '—',
                 style: AppTextStyles.titleLarge(
                   color: isDark
                       ? AppColors.darkOnBackground
@@ -397,7 +418,7 @@ class _UserInfoSection extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'alex@example.com',
+                user?.email ?? '—',
                 style: AppTextStyles.bodyMedium(
                   color: isDark ? AppColors.darkMuted : AppColors.muted,
                 ),
