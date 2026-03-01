@@ -41,7 +41,7 @@ class OptionalBudgetCards extends StatelessWidget {
               budget: weeklyBudget,
             ),
           ),
-        if (showWeekly && showMonthly) const SizedBox(width: 12),
+        if (showWeekly && showMonthly) const SizedBox(width: AppSpacing.xs),
         if (showMonthly)
           Expanded(
             child: _MiniCard(
@@ -82,16 +82,16 @@ class _MiniCard extends StatelessWidget {
         border: Border.all(
           color: isDark ? AppColors.darkDivider : AppColors.divider,
         ),
-        boxShadow: isDark ? null : AppColors.cardShadow,
+        boxShadow: null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
+            label.toUpperCase(),
             style: AppTextStyles.labelSmall(
               color: isDark ? AppColors.darkMuted : AppColors.muted,
-            ).copyWith(letterSpacing: 0.6, fontWeight: FontWeight.w600),
+            ).copyWith(letterSpacing: 1.0, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           Text(

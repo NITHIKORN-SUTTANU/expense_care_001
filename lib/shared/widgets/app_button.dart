@@ -75,7 +75,7 @@ class AppButton extends StatelessWidget {
           onPressed: isLoading ? null : onPressed,
           child: Text(
             label,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.poppins(
               fontSize: 14,
               fontWeight: FontWeight.w600,
               color: primary,
