@@ -110,7 +110,6 @@ class _BudgetLimitFormState extends State<BudgetLimitForm> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
     final dividerColor = isDark ? AppColors.darkDivider : AppColors.divider;
 
     return Form(
