@@ -62,14 +62,15 @@ class AppTheme {
       ),
       scaffoldBackgroundColor: background,
       dividerColor: divider,
-      textTheme: GoogleFonts.interTextTheme(
+      textTheme: GoogleFonts.poppinsTextTheme(
         ThemeData(brightness: brightness).textTheme,
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: surface,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.inter(
+        titleSpacing: 20,
+        titleTextStyle: GoogleFonts.poppins(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           color: onBackground,
@@ -100,10 +101,10 @@ class AppTheme {
           elevation: 0,
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.button),
+            borderRadius: BorderRadius.circular(14),
           ),
           textStyle:
-              GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700),
+              GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -112,10 +113,10 @@ class AppTheme {
           side: BorderSide(color: primary, width: 1.5),
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.button),
+            borderRadius: BorderRadius.circular(14),
           ),
           textStyle:
-              GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
+              GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -139,7 +140,7 @@ class AppTheme {
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        hintStyle: GoogleFonts.inter(
+        hintStyle: GoogleFonts.poppins(
           color: isDark ? AppColors.darkMuted : AppColors.muted,
           fontSize: 14,
         ),
@@ -147,8 +148,8 @@ class AppTheme {
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: primary,
         foregroundColor: onPrimary,
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(

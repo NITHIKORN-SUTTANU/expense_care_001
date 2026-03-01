@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
@@ -28,6 +29,8 @@ class _SummaryScreenState extends State<SummaryScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDark ? AppColors.darkDivider : AppColors.divider;
+    final surfaceColor = isDark ? AppColors.darkSurface : AppColors.surface;
 
     return Scaffold(
       body: CustomScrollView(
@@ -35,7 +38,8 @@ class _SummaryScreenState extends State<SummaryScreen> {
           SliverAppBar(
             pinned: true,
             expandedHeight: 0,
-            backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
+            backgroundColor: surfaceColor,
+            titleSpacing: 20,
             title: Text(
               'Summary',
               style: AppTextStyles.titleLarge(
@@ -46,30 +50,20 @@ class _SummaryScreenState extends State<SummaryScreen> {
             ),
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
-              child: Divider(
-                height: 1,
-                color: isDark ? AppColors.darkDivider : AppColors.divider,
-              ),
+              child: Divider(height: 1, color: borderColor),
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.sm,
-              AppSpacing.sm,
-              AppSpacing.sm,
-              AppSpacing.sm + 80,
-            ),
+            padding: const EdgeInsets.fromLTRB(20, AppSpacing.sm, 20, AppSpacing.sm + 80),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // Period selector
+                // ── Period selector ──────────────────────────────────────
                 Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(AppSpacing.xxs),
                   decoration: BoxDecoration(
-                    color: isDark ? AppColors.darkSurface : AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isDark ? AppColors.darkDivider : AppColors.divider,
-                    ),
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(AppRadius.chip + 4),
+                    border: Border.all(color: borderColor),
                   ),
                   child: Row(
                     children: List.generate(_periods.length, (i) {
@@ -84,16 +78,16 @@ class _SummaryScreenState extends State<SummaryScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 9),
                             decoration: BoxDecoration(
                               color: isSelected ? primary : Colors.transparent,
-                              borderRadius: BorderRadius.circular(9),
+                              borderRadius: BorderRadius.circular(AppRadius.chip),
                             ),
                             child: Text(
                               _periods[i],
                               textAlign: TextAlign.center,
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: 13,
                                 fontWeight: isSelected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
                                 color: isSelected
                                     ? Colors.white
                                     : (isDark
@@ -108,45 +102,59 @@ class _SummaryScreenState extends State<SummaryScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.sm),
 
-                // Stats bar
+                // ── Stats bar ─────────────────────────────────────────────
                 Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.darkSurface : AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    border: Border.all(
-                      color: isDark ? AppColors.darkDivider : AppColors.divider,
-                    ),
-                    boxShadow: isDark ? null : AppColors.cardShadow,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: AppSpacing.sm,
+                    horizontal: AppSpacing.xs,
                   ),
-                  child: Row(
-                    children: [
-                      _Stat(
-                        label: 'Total Spent',
-                        value: '\$${_total.toStringAsFixed(2)}',
-                        isDark: isDark,
-                      ),
-                      _VerticalDivider(isDark: isDark),
-                      _Stat(
-                        label: 'Transactions',
-                        value: '47',
-                        isDark: isDark,
-                      ),
-                      _VerticalDivider(isDark: isDark),
-                      _Stat(
-                        label: 'Largest',
-                        value: '\$187.40',
-                        isDark: isDark,
-                      ),
-                    ],
+                  decoration: BoxDecoration(
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(AppRadius.card),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: IntrinsicHeight(
+                    child: Row(
+                      children: [
+                        _Stat(
+                          label: 'Total Spent',
+                          value: '\$${_total.toStringAsFixed(2)}',
+                          isDark: isDark,
+                        ),
+                        VerticalDivider(
+                          width: 1,
+                          thickness: 1,
+                          color: borderColor,
+                          indent: 4,
+                          endIndent: 4,
+                        ),
+                        _Stat(
+                          label: 'Transactions',
+                          value: '47',
+                          isDark: isDark,
+                        ),
+                        VerticalDivider(
+                          width: 1,
+                          thickness: 1,
+                          color: borderColor,
+                          indent: 4,
+                          endIndent: 4,
+                        ),
+                        _Stat(
+                          label: 'Largest',
+                          value: '\$187.40',
+                          isDark: isDark,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.md),
 
-                // Simple pie chart (using fl_chart in production)
+                // ── Pie chart ─────────────────────────────────────────────
                 Center(
                   child: SizedBox(
                     width: 200,
@@ -183,82 +191,94 @@ class _SummaryScreenState extends State<SummaryScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.md),
 
-                // Category list
-                ..._categories.map((cat) {
-                  final pct = (cat.amount / _total * 100).toStringAsFixed(0);
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color:
-                            isDark ? AppColors.darkSurface : AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppRadius.card),
-                        border: Border.all(
-                          color: isDark
-                              ? AppColors.darkDivider
-                              : AppColors.divider,
-                        ),
-                        boxShadow: isDark ? null : AppColors.cardShadow,
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: cat.color,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(cat.emoji, style: const TextStyle(fontSize: 20)),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              cat.name,
-                              style: AppTextStyles.labelLarge(
-                                color: isDark
-                                    ? AppColors.darkOnBackground
-                                    : AppColors.onBackground,
+                // ── Category list ─────────────────────────────────────────
+                Container(
+                  decoration: BoxDecoration(
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(AppRadius.card),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.card),
+                    child: Column(
+                      children: _categories.asMap().entries.map((entry) {
+                        final i = entry.key;
+                        final cat = entry.value;
+                        final pct =
+                            (cat.amount / _total * 100).toStringAsFixed(0);
+                        final isLast = i == _categories.length - 1;
+                        return Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: cat.color,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(cat.emoji,
+                                      style: const TextStyle(fontSize: 18)),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      cat.name,
+                                      style: AppTextStyles.labelLarge(
+                                        color: isDark
+                                            ? AppColors.darkOnBackground
+                                            : AppColors.onBackground,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '\$${cat.amount.toStringAsFixed(2)}',
+                                    style: AppTextStyles.labelLarge(
+                                      color: isDark
+                                          ? AppColors.darkOnBackground
+                                          : AppColors.onBackground,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 32,
+                                    child: Text(
+                                      '$pct%',
+                                      textAlign: TextAlign.right,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        color: isDark
+                                            ? AppColors.darkMuted
+                                            : AppColors.muted,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          Text(
-                            '\$${cat.amount.toStringAsFixed(2)}',
-                            style: AppTextStyles.labelLarge(
-                              color: isDark
-                                  ? AppColors.darkOnBackground
-                                  : AppColors.onBackground,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: cat.color.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '$pct%',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: cat.color,
+                            if (!isLast)
+                              Divider(
+                                height: 1,
+                                thickness: 1,
+                                color: borderColor,
+                                indent: 16,
                               ),
-                            ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        );
+                      }).toList(),
                     ),
-                  );
-                }),
+                  ),
+                ),
               ]),
             ),
           ),
@@ -285,6 +305,7 @@ class _Stat extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Expanded(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               value,
@@ -307,19 +328,6 @@ class _Stat extends StatelessWidget {
       );
 }
 
-class _VerticalDivider extends StatelessWidget {
-  const _VerticalDivider({required this.isDark});
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: 1,
-        height: 32,
-        color: isDark ? AppColors.darkDivider : AppColors.divider,
-        margin: const EdgeInsets.symmetric(horizontal: 8),
-      );
-}
-
 class _PieChartPainter extends CustomPainter {
   _PieChartPainter({required this.categories, required this.total});
   final List<_CatData> categories;
@@ -327,22 +335,15 @@ class _PieChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
     final outerRadius = size.width / 2;
     final innerRadius = outerRadius * 0.55;
-    final rect = Rect.fromCircle(center: center, radius: outerRadius);
+    final arcCenter = Offset(size.width / 2, size.height / 2);
+    final arcRadius = (outerRadius + innerRadius) / 2;
+    final arcRect = Rect.fromCircle(center: arcCenter, radius: arcRadius);
 
     double startAngle = -90 * (3.14159 / 180);
     for (final cat in categories) {
       final sweepAngle = (cat.amount / total) * 2 * 3.14159;
-      final paint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = outerRadius - innerRadius
-        ..color = cat.color;
-
-      final arcCenter = Offset(size.width / 2, size.height / 2);
-      final arcRadius = (outerRadius + innerRadius) / 2;
-      final arcRect = Rect.fromCircle(center: arcCenter, radius: arcRadius);
       final arcPaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = outerRadius - innerRadius - 4

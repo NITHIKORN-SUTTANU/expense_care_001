@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../expense/domain/models/expense_model.dart';
 import '../../../expense/domain/models/category_model.dart';
-import '../../../../shared/widgets/app_card.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
 
 class RecentExpensesList extends StatelessWidget {
@@ -21,6 +22,9 @@ class RecentExpensesList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
+    final borderColor = isDark ? AppColors.darkDivider : AppColors.divider;
+    final surfaceColor = isDark ? AppColors.darkSurface : AppColors.surface;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -28,9 +32,10 @@ class RecentExpensesList extends StatelessWidget {
         // Section header
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
-              'Recent Expenses',
+              'Recent',
               style: AppTextStyles.titleMedium(
                 color: isDark
                     ? AppColors.darkOnBackground
@@ -40,39 +45,54 @@ class RecentExpensesList extends StatelessWidget {
             TextButton(
               onPressed: onSeeAll,
               style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                minimumSize: const Size(48, 36),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: Text(
-                'See All',
-                style: TextStyle(
+                'See all',
+                style: GoogleFonts.poppins(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: isDark ? AppColors.darkPrimary : AppColors.primary,
+                  color: primary,
                 ),
               ),
             ),
           ],
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.xs),
 
         if (expenses.isEmpty)
           _EmptyState(isDark: isDark)
         else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: expenses.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              return _ExpenseRow(
-                expense: expenses[index],
-                isDark: isDark,
-                onTap: () => onExpenseTap?.call(expenses[index]),
-              );
-            },
+          Container(
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(color: borderColor, width: 1),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: expenses.length,
+                separatorBuilder: (_, __) => Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: borderColor,
+                  indent: 68,
+                ),
+                itemBuilder: (context, index) {
+                  return _ExpenseRow(
+                    expense: expenses[index],
+                    isDark: isDark,
+                    onTap: () => onExpenseTap?.call(expenses[index]),
+                  );
+                },
+              ),
+            ),
           ),
       ],
     );
@@ -112,72 +132,68 @@ class _ExpenseRow extends StatelessWidget {
     final catEmoji = category?.emoji ?? '📦';
     final catName = category?.name ?? 'Other';
 
-    return AppCard(
+    return InkWell(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          // Category icon circle
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: catColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(catEmoji, style: const TextStyle(fontSize: 22)),
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          // Name + category + time
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  expense.note?.isNotEmpty == true ? expense.note! : catName,
-                  style: AppTextStyles.labelLarge(
-                    color: isDark
-                        ? AppColors.darkOnBackground
-                        : AppColors.onBackground,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '$catName · ${_relativeTime()}',
-                  style: AppTextStyles.labelSmall(
-                    color: isDark ? AppColors.darkMuted : AppColors.muted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // Amount
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '-${_formatAmount()}',
-                style: AppTextStyles.labelLarge(
-                  color: isDark
-                      ? AppColors.darkOnBackground
-                      : AppColors.onBackground,
-                ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            // Category icon
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: catColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              if (!expense.syncedToFirestore)
-                const Icon(Icons.cloud_upload_outlined,
-                    size: 14, color: AppColors.muted),
-            ],
-          ),
-        ],
+              child: Center(
+                child: Text(catEmoji, style: const TextStyle(fontSize: 20)),
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            // Name + category + time
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    expense.note?.isNotEmpty == true ? expense.note! : catName,
+                    style: AppTextStyles.labelLarge(
+                      color: isDark
+                          ? AppColors.darkOnBackground
+                          : AppColors.onBackground,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$catName · ${_relativeTime()}',
+                    style: AppTextStyles.labelSmall(
+                      color: isDark ? AppColors.darkMuted : AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: AppSpacing.xs),
+
+            // Amount
+            Text(
+              '-${_formatAmount()}',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: isDark
+                    ? AppColors.darkOnBackground
+                    : AppColors.onBackground,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -206,7 +222,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Start tracking your spending!',
+              'Start tracking your spending.',
               style: AppTextStyles.bodyMedium(
                 color: isDark ? AppColors.darkMuted : AppColors.muted,
               ),
