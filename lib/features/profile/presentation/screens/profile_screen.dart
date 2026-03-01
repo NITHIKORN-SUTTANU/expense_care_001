@@ -40,6 +40,172 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         );
   }
 
+  static const _currencies = [
+    ('THB', 'Thai Baht', '฿'),
+    ('USD', 'US Dollar', '\$'),
+    ('EUR', 'Euro', '€'),
+    ('GBP', 'British Pound', '£'),
+    ('JPY', 'Japanese Yen', '¥'),
+    ('CNY', 'Chinese Yuan', '¥'),
+    ('KRW', 'Korean Won', '₩'),
+    ('SGD', 'Singapore Dollar', 'S\$'),
+    ('AUD', 'Australian Dollar', 'A\$'),
+    ('CAD', 'Canadian Dollar', 'C\$'),
+    ('CHF', 'Swiss Franc', 'Fr'),
+    ('HKD', 'Hong Kong Dollar', 'HK\$'),
+    ('INR', 'Indian Rupee', '₹'),
+    ('MYR', 'Malaysian Ringgit', 'RM'),
+    ('IDR', 'Indonesian Rupiah', 'Rp'),
+    ('PHP', 'Philippine Peso', '₱'),
+    ('VND', 'Vietnamese Dong', '₫'),
+  ];
+
+  void _showCurrencyPicker(String currentCurrency) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: false,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.surface,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadius.bottomSheetTop),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkDivider : AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
+              child: Text(
+                'Select Currency',
+                style: AppTextStyles.titleLarge(
+                  color: isDark
+                      ? AppColors.darkOnBackground
+                      : AppColors.onBackground,
+                ),
+              ),
+            ),
+            Divider(
+                height: 1,
+                color: isDark ? AppColors.darkDivider : AppColors.divider),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _currencies.length,
+                itemBuilder: (ctx, i) {
+                  final (code, name, symbol) = _currencies[i];
+                  final selected = code == currentCurrency;
+                  final primary =
+                      isDark ? AppColors.darkPrimary : AppColors.primary;
+                  return ListTile(
+                    onTap: () {
+                      if (selected) {
+                        Navigator.pop(ctx);
+                        return;
+                      }
+                      showDialog(
+                        context: ctx,
+                        useRootNavigator: false,
+                        builder: (dialogCtx) => AlertDialog(
+                          title: const Text('Change Currency?'),
+                          content: Text(
+                            'Existing expenses won\'t be converted — '
+                            'numbers stay the same with the new $name ($code) symbol. '
+                            'You should also update your budget limits.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dialogCtx),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                ref
+                                    .read(userPreferencesNotifierProvider
+                                        .notifier)
+                                    .updateCurrency(code);
+                                Navigator.pop(dialogCtx);
+                                Navigator.pop(ctx);
+                              },
+                              child: Text(
+                                'Change to $code',
+                                style: TextStyle(
+                                  color: isDark
+                                      ? AppColors.darkPrimary
+                                      : AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? primary.withValues(alpha: 0.12)
+                            : (isDark
+                                ? AppColors.darkBackground
+                                : AppColors.background),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Center(
+                        child: Text(
+                          symbol,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: selected ? primary : (isDark ? AppColors.darkOnBackground : AppColors.onBackground),
+                          ),
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      name,
+                      style: AppTextStyles.bodyMedium(
+                        color: isDark
+                            ? AppColors.darkOnBackground
+                            : AppColors.onBackground,
+                      ).copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.w400),
+                    ),
+                    subtitle: Text(
+                      code,
+                      style: AppTextStyles.labelSmall(
+                        color: isDark ? AppColors.darkMuted : AppColors.muted,
+                      ),
+                    ),
+                    trailing: selected
+                        ? Icon(Icons.check_rounded, color: primary, size: 20)
+                        : null,
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + AppSpacing.xs),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _handleSignOut() {
     showDialog(
       context: context,
@@ -206,7 +372,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             ),
                           ],
                         ),
-                        onTap: () {},
+                        onTap: () => _showCurrencyPicker(currency),
                         showDivider: true,
                       ),
 

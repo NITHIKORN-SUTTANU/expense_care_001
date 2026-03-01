@@ -39,6 +39,7 @@ class OptionalBudgetCards extends StatelessWidget {
               label: 'Weekly',
               spent: weeklySpent,
               budget: weeklyBudget,
+              currency: currency,
             ),
           ),
         if (showWeekly && showMonthly) const SizedBox(width: AppSpacing.xs),
@@ -48,6 +49,7 @@ class OptionalBudgetCards extends StatelessWidget {
               label: 'Monthly',
               spent: monthlySpent,
               budget: monthlyBudget,
+              currency: currency,
             ),
           ),
       ],
@@ -60,14 +62,16 @@ class _MiniCard extends StatelessWidget {
     required this.label,
     required this.spent,
     required this.budget,
+    required this.currency,
   });
 
   final String label;
   final double spent;
   final double budget;
+  final String currency;
 
   String _fmt(double v) =>
-      NumberFormat.currency(symbol: '\$', decimalDigits: 0).format(v);
+      NumberFormat.simpleCurrency(name: currency, decimalDigits: 0).format(v);
 
   @override
   Widget build(BuildContext context) {

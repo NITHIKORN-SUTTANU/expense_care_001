@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import '../domain/models/user_model.dart';
 import '../../../core/errors/failure.dart';
@@ -59,6 +60,13 @@ class AuthRepository {
 
   Future<UserModel> signInWithGoogle() async {
     try {
+      if (kIsWeb) {
+        // On web, use Firebase Auth's signInWithPopup — avoids the deprecated
+        // google_sign_in signIn() that can't reliably return an idToken on web.
+        final userCredential =
+            await _auth.signInWithPopup(GoogleAuthProvider());
+        return _fetchOrCreateUser(userCredential.user!);
+      }
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) throw const AuthFailure('Sign-in cancelled');
       final googleAuth = await googleUser.authentication;

@@ -121,7 +121,7 @@ class _ExpenseRow extends StatelessWidget {
   }
 
   String _formatAmount() {
-    return NumberFormat.currency(symbol: '\$', decimalDigits: 2)
+    return NumberFormat.simpleCurrency(name: expense.currency, decimalDigits: 2)
         .format(expense.amountInBaseCurrency);
   }
 
