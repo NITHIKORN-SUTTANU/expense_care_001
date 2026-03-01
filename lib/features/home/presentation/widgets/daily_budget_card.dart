@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'budget_progress_bar.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -38,64 +39,49 @@ class DailyBudgetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
     final error = isDark ? AppColors.darkError : AppColors.error;
     final statusColor = _statusColor(context);
-
-    final bgGradientColor = _isOverBudget
-        ? error.withValues(alpha: 0.08)
-        : primary.withValues(alpha: 0.06);
-    final borderColor = _isOverBudget
-        ? error.withValues(alpha: 0.3)
-        : primary.withValues(alpha: 0.2);
+    final borderColor = isDark ? AppColors.darkDivider : AppColors.divider;
+    final surfaceColor = isDark ? AppColors.darkSurface : AppColors.surface;
 
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            bgGradientColor,
-            isDark ? AppColors.darkSurface : AppColors.surface,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.card + 4),
-        border: Border.all(color: borderColor, width: 1.5),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: (primary).withValues(alpha: 0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: borderColor, width: 1),
       ),
       padding: const EdgeInsets.all(AppSpacing.sm + 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row
+          // Section label
+          Text(
+            'DAILY BUDGET',
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
+              color: isDark ? AppColors.darkMuted : AppColors.muted,
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.xs),
+
+          // Hero row: remaining amount + status badge
           Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Daily Budget',
-                    style: AppTextStyles.labelSmall(
-                      color: isDark ? AppColors.darkMuted : AppColors.muted,
-                    ).copyWith(
-                      letterSpacing: 0.8,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
                     _formatCurrency(_remaining.abs()),
-                    style: AppTextStyles.displayLarge(
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 36,
+                      height: 1.1,
+                      letterSpacing: -0.5,
                       color: _isOverBudget
                           ? error
                           : isDark
@@ -105,9 +91,7 @@ class DailyBudgetCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _isOverBudget
-                        ? 'Over budget by ${_formatCurrency(_remaining.abs())}'
-                        : 'remaining today',
+                    _isOverBudget ? 'over budget today' : 'remaining today',
                     style: AppTextStyles.bodyMedium(
                       color: isDark ? AppColors.darkMuted : AppColors.muted,
                     ),
@@ -118,14 +102,14 @@ class DailyBudgetCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(AppRadius.chip),
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   '${_pct.toStringAsFixed(0)}%',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: statusColor,
                   ),
                 ),
@@ -133,27 +117,27 @@ class DailyBudgetCard extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.sm),
 
           // Progress bar
           BudgetProgressBar(
             spentAmount: spent,
             budgetAmount: budget,
-            height: 8,
+            height: 6,
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.xs + 2),
 
-          // Spent / Limit row
+          // Spent / Limit stats
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _StatText(
+              _StatLabel(
                 label: 'Spent',
                 value: _formatCurrency(spent),
                 isDark: isDark,
               ),
-              _StatText(
+              _StatLabel(
                 label: 'Limit',
                 value: _formatCurrency(budget),
                 isDark: isDark,
@@ -166,8 +150,8 @@ class DailyBudgetCard extends StatelessWidget {
   }
 }
 
-class _StatText extends StatelessWidget {
-  const _StatText({
+class _StatLabel extends StatelessWidget {
+  const _StatLabel({
     required this.label,
     required this.value,
     required this.isDark,
@@ -179,24 +163,26 @@ class _StatText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RichText(
-      text: TextSpan(
-        text: '$label: ',
-        style: TextStyle(
-          fontSize: 13,
-          color: isDark ? AppColors.darkMuted : AppColors.muted,
-          fontWeight: FontWeight.w400,
-        ),
-        children: [
-          TextSpan(
-            text: value,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              color: isDark ? AppColors.darkOnSurface : AppColors.onSurface,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: isDark ? AppColors.darkMuted : AppColors.muted,
           ),
-        ],
-      ),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: isDark ? AppColors.darkOnSurface : AppColors.onSurface,
+          ),
+        ),
+      ],
     );
   }
 }

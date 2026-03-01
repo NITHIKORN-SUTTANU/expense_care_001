@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
@@ -114,6 +115,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             pinned: true,
             expandedHeight: 0,
             backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
+            titleSpacing: 20,
             title: Text(
               'Profile',
               style: AppTextStyles.titleLarge(
@@ -134,9 +136,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           // ── Body ─────────────────────────────────────────────────────────
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
+              20,
               AppSpacing.sm,
-              AppSpacing.sm,
-              AppSpacing.sm,
+              20,
               AppSpacing.sm + 80,
             ),
             sliver: SliverList(
@@ -355,36 +357,23 @@ class _UserInfoSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
-    final primaryVariant =
-        isDark ? AppColors.darkPrimaryVariant : AppColors.primaryVariant;
 
     return Row(
       children: [
-        // Avatar
+        // Avatar — circular, flat, single-color
         Container(
-          width: 64,
-          height: 64,
+          width: 72,
+          height: 72,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [primary, primaryVariant],
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: primary.withValues(alpha: 0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            color: primary,
+            shape: BoxShape.circle,
           ),
-          child: const Center(
+          child: Center(
             child: Text(
               'A',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: 28,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),
             ),
@@ -430,9 +419,9 @@ class _UserInfoSection extends StatelessWidget {
           ),
           child: Text(
             'Edit',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: 13,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: primary,
             ),
           ),

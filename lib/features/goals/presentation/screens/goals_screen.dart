@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../shared/widgets/app_card.dart';
 
 class GoalsScreen extends StatelessWidget {
   const GoalsScreen({super.key});
@@ -28,6 +28,20 @@ class GoalsScreen extends StatelessWidget {
         saved: 420,
         color: secondary,
       ),
+      _GoalData(
+        name: 'Emergency Fund',
+        emoji: '🛡️',
+        target: 5000,
+        saved: 2800,
+        color: AppColors.catHealth,
+      ),
+      _GoalData(
+        name: 'New Camera',
+        emoji: '📷',
+        target: 800,
+        saved: 150,
+        color: AppColors.catShopping,
+      ),
     ];
 
     return Scaffold(
@@ -37,8 +51,9 @@ class GoalsScreen extends StatelessWidget {
             pinned: true,
             expandedHeight: 0,
             backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
+            titleSpacing: 20,
             title: Text(
-              'My Goals',
+              'Goals',
               style: AppTextStyles.titleLarge(
                 color: isDark
                     ? AppColors.darkOnBackground
@@ -63,18 +78,23 @@ class GoalsScreen extends StatelessWidget {
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
+              20,
               AppSpacing.sm,
-              AppSpacing.sm,
-              AppSpacing.sm,
+              20,
               AppSpacing.sm + 80,
             ),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                ...mockGoals.map((goal) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _GoalCard(goal: goal, isDark: isDark),
-                    )),
-              ]),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: AppSpacing.sm,
+                mainAxisSpacing: AppSpacing.sm,
+                childAspectRatio: 0.85,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) =>
+                    _GoalCard(goal: mockGoals[index], isDark: isDark),
+                childCount: mockGoals.length,
+              ),
             ),
           ),
         ],
@@ -110,92 +130,99 @@ class _GoalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pctLabel = '${(goal.pct * 100).toStringAsFixed(0)}%';
+    final borderColor = isDark ? AppColors.darkDivider : AppColors.divider;
+    final surfaceColor = isDark ? AppColors.darkSurface : AppColors.surface;
 
-    return AppCard(
+    return Container(
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: borderColor, width: 1),
+      ),
       padding: const EdgeInsets.all(AppSpacing.sm),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Progress ring + emoji
+          // Circular progress + emoji
           SizedBox(
-            width: 64,
-            height: 64,
+            width: 72,
+            height: 72,
             child: Stack(
               alignment: Alignment.center,
               children: [
                 CircularProgressIndicator(
                   value: goal.pct,
                   strokeWidth: 5,
-                  backgroundColor:
-                      (isDark ? AppColors.darkDivider : AppColors.divider),
+                  backgroundColor: borderColor,
                   valueColor: AlwaysStoppedAnimation<Color>(goal.color),
                 ),
-                Text(goal.emoji, style: const TextStyle(fontSize: 24)),
+                Text(goal.emoji, style: const TextStyle(fontSize: 26)),
               ],
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  goal.name,
-                  style: AppTextStyles.titleMedium(
-                    color: isDark
-                        ? AppColors.darkOnBackground
-                        : AppColors.onBackground,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Saved ${_fmt(goal.saved)} of ${_fmt(goal.target)}',
-                  style: AppTextStyles.bodyMedium(
-                    color: isDark ? AppColors.darkMuted : AppColors.muted,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: goal.pct,
-                    backgroundColor:
-                        isDark ? AppColors.darkDivider : AppColors.divider,
-                    valueColor: AlwaysStoppedAnimation<Color>(goal.color),
-                    minHeight: 6,
-                  ),
-                ),
-              ],
+
+          const SizedBox(height: AppSpacing.xs),
+
+          // Goal name
+          Text(
+            goal.name,
+            style: AppTextStyles.labelLarge(
+              color: isDark
+                  ? AppColors.darkOnBackground
+                  : AppColors.onBackground,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+
+          const SizedBox(height: 2),
+
+          // Saved / target
+          Text(
+            '${_fmt(goal.saved)} of ${_fmt(goal.target)}',
+            style: AppTextStyles.labelSmall(
+              color: isDark ? AppColors.darkMuted : AppColors.muted,
+            ),
+            textAlign: TextAlign.center,
+          ),
+
+          const Spacer(),
+
+          // Progress bar + percentage
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: goal.pct,
+              backgroundColor: borderColor,
+              valueColor: AlwaysStoppedAnimation<Color>(goal.color),
+              minHeight: 6,
             ),
           ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+
+          const SizedBox(height: AppSpacing.xs),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 pctLabel,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                   color: goal.color,
                 ),
               ),
-              const SizedBox(height: 6),
-              OutlinedButton(
-                onPressed: () {},
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(60, 32),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  side: BorderSide(color: goal.color, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  foregroundColor: goal.color,
-                  textStyle: const TextStyle(
+              GestureDetector(
+                onTap: () {},
+                child: Text(
+                  'Add +',
+                  style: GoogleFonts.poppins(
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
+                    color: goal.color,
                   ),
                 ),
-                child: const Text('Add +'),
               ),
             ],
           ),

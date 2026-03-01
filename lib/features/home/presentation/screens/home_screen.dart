@@ -106,24 +106,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final now = DateTime.now();
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
     return '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
   }
 
   void _onAddExpense() {
-    // TODO: show AddExpenseScreen as bottom sheet
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -135,7 +124,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
 
     return Scaffold(
       body: CustomScrollView(
@@ -148,7 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
             systemOverlayStyle:
                 isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-            titleSpacing: AppSpacing.sm,
+            titleSpacing: 20,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -159,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Text(
-                  '$_greeting, Alex 👋',
+                  '$_greeting, Alex',
                   style: AppTextStyles.titleLarge(
                     color: isDark
                         ? AppColors.darkOnBackground
@@ -193,9 +181,9 @@ class _HomeScreenState extends State<HomeScreen> {
           // ── Content ──────────────────────────────────────────────────────
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
+              20,
               AppSpacing.sm,
-              AppSpacing.sm,
-              AppSpacing.sm,
+              20,
               AppSpacing.sm + 80, // bottom nav + extra space
             ),
             sliver: SliverList(
@@ -207,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   currency: 'USD',
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.xs),
 
                 // Weekly / Monthly cards
                 const OptionalBudgetCards(
@@ -231,9 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 RecentExpensesList(
                   expenses: _recentExpenses,
                   onSeeAll: () {},
-                  onExpenseTap: (expense) {
-                    // TODO: show expense detail bottom sheet
-                  },
+                  onExpenseTap: (expense) {},
                 ),
               ]),
             ),
@@ -261,7 +247,7 @@ class _AddExpensePlaceholder extends StatelessWidget {
         children: [
           const SizedBox(height: 12),
           Container(
-            width: 40,
+            width: 36,
             height: 4,
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkDivider : AppColors.divider,

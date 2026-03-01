@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_spacing.dart';
 import '../../core/router/app_router.dart';
 
 class MainShell extends StatelessWidget {
@@ -55,18 +55,10 @@ class MainShell extends StatelessWidget {
               width: 1,
             ),
           ),
-          boxShadow: isDark
-              ? null
-              : [
-                  BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 16,
-                      offset: const Offset(0, -4))
-                ],
         ),
         child: SafeArea(
           child: SizedBox(
-            height: 60,
+            height: 64,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(_tabs.length, (index) {
@@ -80,33 +72,33 @@ class MainShell extends StatelessWidget {
                 return Expanded(
                   child: InkWell(
                     onTap: () => context.go(tab.route),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        // Active top-bar indicator
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
+                          width: isActive ? 20 : 0,
+                          height: 2,
                           decoration: BoxDecoration(
-                            color: isActive
-                                ? primaryColor.withValues(alpha: 0.12)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(AppRadius.chip),
-                          ),
-                          child: Icon(
-                            isActive ? tab.activeIcon : tab.inactiveIcon,
-                            size: 22,
-                            color: isActive ? primaryColor : mutedColor,
+                            color: primaryColor,
+                            borderRadius: BorderRadius.circular(1),
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 6),
+                        Icon(
+                          isActive ? tab.activeIcon : tab.inactiveIcon,
+                          size: 24,
+                          color: isActive ? primaryColor : mutedColor,
+                        ),
+                        const SizedBox(height: 4),
                         Text(
                           tab.label,
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: 11,
                             fontWeight:
-                                isActive ? FontWeight.w700 : FontWeight.w500,
+                                isActive ? FontWeight.w600 : FontWeight.w400,
                             color: isActive ? primaryColor : mutedColor,
                           ),
                         ),
