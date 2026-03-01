@@ -22,6 +22,8 @@ class BudgetProgressBar extends StatelessWidget {
 
   Color _barColor(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (budgetAmount <= 0)
+      return isDark ? AppColors.darkSuccess : AppColors.success;
     final pct = spentAmount / budgetAmount * 100;
     if (pct >= 100) return isDark ? AppColors.darkError : AppColors.error;
     if (pct >= 80) return isDark ? AppColors.darkWarning : AppColors.warning;
