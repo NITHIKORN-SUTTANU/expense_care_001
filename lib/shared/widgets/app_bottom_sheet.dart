@@ -29,13 +29,15 @@ class _AppBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkSurface : AppColors.surface;
+    final borderColor = isDark ? AppColors.darkDivider : AppColors.divider;
 
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.92,
       ),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.surface,
+        color: bg,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(AppRadius.bottomSheetTop),
         ),
@@ -45,38 +47,40 @@ class _AppBottomSheet extends StatelessWidget {
         children: [
           // Drag handle
           Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 4),
+            padding: const EdgeInsets.only(top: 14, bottom: 6),
             child: Container(
-              width: 36,
+              width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: isDark ? AppColors.darkDivider : AppColors.divider,
+                color: borderColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
+
           if (title != null) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.xs,
-                AppSpacing.md,
-                AppSpacing.xs,
+                AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.sm,
               ),
-              child: Text(
-                title!,
-                style: AppTextStyles.titleLarge(
-                  color: isDark
-                      ? AppColors.darkOnBackground
-                      : AppColors.onBackground,
-                ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title!,
+                      style: AppTextStyles.titleLarge(
+                        color: isDark
+                            ? AppColors.darkOnBackground
+                            : AppColors.onBackground,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            Divider(
-              height: 1,
-              color: isDark ? AppColors.darkDivider : AppColors.divider,
-            ),
+            Divider(height: 1, color: borderColor),
           ],
+
           Flexible(child: child),
         ],
       ),
