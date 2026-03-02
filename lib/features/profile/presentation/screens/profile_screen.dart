@@ -439,44 +439,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 );
                           },
                         ),
-                        showDivider: true,
-                      ),
-
-                      // Show Weekly on Home
-                      _ListTile(
-                        label: 'Show Weekly Budget on Home',
-                        isDark: isDark,
-                        trailing: Switch(
-                          value: showWeekly,
-                          onChanged: (val) => ref
-                              .read(userPreferencesNotifierProvider.notifier)
-                              .updateLimits(
-                                dailyLimit: dailyLimit,
-                                weeklyLimit: weeklyLimit,
-                                monthlyLimit: monthlyLimit,
-                                showWeeklyOnHome: val,
-                                showMonthlyOnHome: showMonthly,
-                              ),
-                        ),
-                        showDivider: true,
-                      ),
-
-                      // Show Monthly on Home
-                      _ListTile(
-                        label: 'Show Monthly Budget on Home',
-                        isDark: isDark,
-                        trailing: Switch(
-                          value: showMonthly,
-                          onChanged: (val) => ref
-                              .read(userPreferencesNotifierProvider.notifier)
-                              .updateLimits(
-                                dailyLimit: dailyLimit,
-                                weeklyLimit: weeklyLimit,
-                                monthlyLimit: monthlyLimit,
-                                showWeeklyOnHome: showWeekly,
-                                showMonthlyOnHome: val,
-                              ),
-                        ),
                         showDivider: false,
                       ),
                     ],

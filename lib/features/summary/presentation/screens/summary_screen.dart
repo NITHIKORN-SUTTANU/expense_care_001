@@ -12,6 +12,7 @@ import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/app_date_utils.dart';
 import '../../../../shared/providers/user_preferences_provider.dart';
 import '../../../../shared/widgets/app_bottom_sheet.dart';
+import '../../../../shared/widgets/app_date_picker.dart';
 import '../../../expense/data/expense_repository.dart';
 import '../../../expense/domain/models/category_model.dart';
 import '../../../expense/domain/models/expense_model.dart';
@@ -54,7 +55,7 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
             AppDateUtils.startOfMonth(now), AppDateUtils.endOfDay(now));
       default: // 2 = Month
         return DateRangeKey(
-            AppDateUtils.startOfMonth(now), AppDateUtils.endOfDay(now));
+            AppDateUtils.startOfMonth(now), AppDateUtils.endOfMonth(now));
     }
   }
 
@@ -62,14 +63,21 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
     final now = DateTime.now();
     switch (_selectedPeriod) {
       case 0:
-        return AppDateUtils.formatDate(now);
+        return DateFormat('EEE, MMM d, y').format(now);
       case 1:
-        return '${AppDateUtils.formatShort(AppDateUtils.startOfWeek(now))} – ${AppDateUtils.formatShort(now)}';
+        final weekStart = AppDateUtils.startOfWeek(now);
+        final startStr = weekStart.year == now.year
+            ? DateFormat('MMM d').format(weekStart)
+            : DateFormat('MMM d, y').format(weekStart);
+        return '$startStr – ${DateFormat('MMM d, y').format(now)}';
       case 2:
         return DateFormat('MMMM y').format(now);
       case 3:
         if (_customStart != null && _customEnd != null) {
-          return '${AppDateUtils.formatShort(_customStart!)} – ${AppDateUtils.formatShort(_customEnd!)}';
+          final startStr = _customStart!.year == _customEnd!.year
+              ? DateFormat('MMM d').format(_customStart!)
+              : DateFormat('MMM d, y').format(_customStart!);
+          return '$startStr – ${DateFormat('MMM d, y').format(_customEnd!)}';
         }
         return 'Selecting range…';
       default:
@@ -81,11 +89,11 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
 
   Future<void> _pickCustomRange() async {
     final now = DateTime.now();
-    final picked = await showDateRangePicker(
+    final picked = await showAppDateRangePicker(
       context: context,
       firstDate: DateTime(2020),
       lastDate: now,
-      initialDateRange: (_customStart != null && _customEnd != null)
+      initialRange: (_customStart != null && _customEnd != null)
           ? DateTimeRange(start: _customStart!, end: _customEnd!)
           : DateTimeRange(start: AppDateUtils.startOfMonth(now), end: now),
     );
@@ -830,7 +838,7 @@ class _CategoryExpensesSheet extends ConsumerWidget {
 
                       // Amount + edit hint
                       Text(
-                        fmt.format(expense.amount),
+                        fmt.format(expense.amountInBaseCurrency),
                         style: GoogleFonts.poppins(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,

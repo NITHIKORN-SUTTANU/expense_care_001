@@ -32,7 +32,7 @@ class AppDateUtils {
       DateTime(date.year, date.month, date.day);
 
   static DateTime endOfDay(DateTime date) =>
-      DateTime(date.year, date.month, date.day, 23, 59, 59);
+      DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
 
   static DateTime startOfWeek(DateTime date) {
     final diff = date.weekday - DateTime.monday;
@@ -43,5 +43,5 @@ class AppDateUtils {
       DateTime(date.year, date.month, 1);
 
   static DateTime endOfMonth(DateTime date) =>
-      DateTime(date.year, date.month + 1, 0, 23, 59, 59);
+      DateTime(date.year, date.month + 1, 0, 23, 59, 59, 999);
 }
