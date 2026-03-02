@@ -14,6 +14,7 @@ import '../../../../shared/widgets/empty_state.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../expense/domain/models/category_model.dart';
 import '../../../expense/presentation/widgets/category_selector.dart';
+import '../../../../shared/widgets/app_date_picker.dart';
 import '../../../recurring/domain/models/recurring_expense_model.dart';
 
 // ── Firestore provider ────────────────────────────────────────────────────────
@@ -335,7 +336,7 @@ class _AddRecurringSheetState extends ConsumerState<_AddRecurringSheet> {
   }
 
   Future<void> _pickStartDate() async {
-    final picked = await showDatePicker(
+    final picked = await showAppDatePicker(
       context: context,
       initialDate: _startDate,
       firstDate: DateTime(2020),

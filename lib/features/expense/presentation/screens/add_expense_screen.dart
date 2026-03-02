@@ -8,6 +8,7 @@ import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
+import '../../../../shared/widgets/app_date_picker.dart';
 import '../../../../shared/widgets/error_snackbar.dart';
 import '../../data/expense_repository.dart';
 import '../../domain/models/expense_model.dart';
@@ -59,27 +60,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _amountCtrl.text.isNotEmpty && _selectedCategoryId != null;
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    final picked = await showAppDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
+      withTime: true,
     );
     if (picked == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_selectedDate),
-    );
-    if (!mounted) return;
-    setState(() {
-      _selectedDate = DateTime(
-        picked.year,
-        picked.month,
-        picked.day,
-        time?.hour ?? _selectedDate.hour,
-        time?.minute ?? _selectedDate.minute,
-      );
-    });
+    setState(() => _selectedDate = picked);
   }
 
   Future<void> _submit() async {
