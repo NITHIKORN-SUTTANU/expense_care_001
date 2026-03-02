@@ -12,9 +12,10 @@ class AppSpacing {
 class AppRadius {
   AppRadius._();
   static const double card = 16.0;
-  static const double button = 12.0;
-  static const double input = 10.0;
-  static const double chip = 8.0;
-  static const double bottomSheetTop = 24.0;
-  static const double modal = 20.0;
+  static const double button = 26.0;      // pill-shaped
+  static const double input = 12.0;       // more rounded fields
+  static const double chip = 10.0;
+  static const double bottomSheetTop = 28.0;
+  static const double modal = 24.0;
+  static const double icon = 16.0;        // icon container corners
 }

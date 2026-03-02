@@ -99,9 +99,10 @@ class AppTheme {
           backgroundColor: primary,
           foregroundColor: onPrimary,
           elevation: 0,
-          minimumSize: const Size(double.infinity, 52),
+          shadowColor: Colors.transparent,
+          minimumSize: const Size(double.infinity, 54),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.button),
           ),
           textStyle:
               GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
@@ -110,10 +111,10 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: primary,
-          side: BorderSide(color: primary, width: 1.5),
-          minimumSize: const Size(double.infinity, 52),
+          side: BorderSide(color: divider, width: 1.5),
+          minimumSize: const Size(double.infinity, 54),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.button),
           ),
           textStyle:
               GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
@@ -121,7 +122,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: background,
+        fillColor: isDark ? AppColors.darkSurface : AppColors.surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
           borderSide: BorderSide(color: divider),
@@ -143,8 +144,18 @@ class AppTheme {
           borderSide: BorderSide(color: error, width: 1.5),
         ),
         errorMaxLines: 3,
+        labelStyle: GoogleFonts.poppins(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          color: isDark ? AppColors.darkMuted : AppColors.muted,
+        ),
+        floatingLabelStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: primary,
+        ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         hintStyle: GoogleFonts.poppins(
           color: isDark ? AppColors.darkMuted : AppColors.muted,
           fontSize: 14,
@@ -154,7 +165,8 @@ class AppTheme {
         backgroundColor: primary,
         foregroundColor: onPrimary,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.button)),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
