@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/services/notification_service.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/connectivity_provider.dart';
@@ -37,7 +39,8 @@ DateTime _addMonths(DateTime base, int months) {
   final totalMonth = base.month - 1 + months;
   final year = base.year + totalMonth ~/ 12;
   final month = totalMonth % 12 + 1;
-  final lastDay = DateTime(year, month + 1, 0).day; // day 0 = last of prev month
+  final lastDay =
+      DateTime(year, month + 1, 0).day; // day 0 = last of prev month
   return DateTime(year, month, base.day.clamp(1, lastDay));
 }
 
@@ -62,8 +65,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final now = DateTime.now();
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
   }
@@ -170,12 +183,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  Future<void> _checkBudgetAlerts(double total, double limit) async {
+    if (limit <= 0) return;
+    final pct = total / limit;
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+
+    // 80% warning — also fires when spending jumps directly past 100%
+    if (pct >= 0.8) {
+      final key = 'budget_alert_80_$today';
+      if (prefs.getBool(key) != true) {
+        await prefs.setBool(key, true);
+        await NotificationService.instance.show(
+          id: 1,
+          title: 'Budget Warning',
+          body: "You've used 80% of your daily budget.",
+        );
+      }
+    }
+
+    if (pct >= 1.0) {
+      final key = 'budget_alert_100_$today';
+      if (prefs.getBool(key) != true) {
+        await prefs.setBool(key, true);
+        await NotificationService.instance.show(
+          id: 2,
+          title: 'Budget Exceeded',
+          body: "You've exceeded your daily budget!",
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Trigger check when auth resolves after mount (e.g. cold start)
     ref.listen<AsyncValue<User?>>(authStateProvider, (_, next) {
       next.whenData((user) {
         if (user != null) _runRecurringCheck(user.uid);
+      });
+    });
+
+    // Fire budget alerts when daily spending crosses 80% or 100% of limit
+    ref.listen<AsyncValue<double>>(dailyTotalProvider, (prev, next) {
+      final prevTotal = prev?.valueOrNull ?? 0.0;
+      next.whenData((total) {
+        if (total <= prevTotal) return;
+        final limit =
+            ref.read(userPreferencesNotifierProvider)?.dailyLimit ?? 0.0;
+        _checkBudgetAlerts(total, limit);
       });
     });
 
@@ -221,11 +277,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             pinned: true,
             floating: false,
             expandedHeight: 0,
-            backgroundColor:
-                isDark ? AppColors.darkSurface : AppColors.surface,
-            systemOverlayStyle: isDark
-                ? SystemUiOverlayStyle.light
-                : SystemUiOverlayStyle.dark,
+            backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
+            systemOverlayStyle:
+                isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
             titleSpacing: 20,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,8 +327,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         const SizedBox(width: 6),
                         Text(
                           'No internet connection',
-                          style: AppTextStyles.labelSmall(
-                              color: Colors.white),
+                          style: AppTextStyles.labelSmall(color: Colors.white),
                         ),
                       ],
                     ),
@@ -308,9 +361,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     budget: dailyBudget,
                     currency: currency,
                   ),
-
                   const SizedBox(height: AppSpacing.xs),
-
                   OptionalBudgetCards(
                     weeklySpent: weeklySpent,
                     weeklyBudget: weeklyBudget,
@@ -320,9 +371,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     showMonthly: showMonthly,
                     currency: currency,
                   ),
-
                   const SizedBox(height: AppSpacing.md),
-
                   RecentExpensesList(
                     expenses: recentExpenses,
                     onSeeAll: () => context.go(AppRoutes.summary),
@@ -367,9 +416,8 @@ class _BudgetSetupPrompt extends StatelessWidget {
           Text(
             'Set your budget first',
             style: AppTextStyles.titleLarge(
-              color: isDark
-                  ? AppColors.darkOnBackground
-                  : AppColors.onBackground,
+              color:
+                  isDark ? AppColors.darkOnBackground : AppColors.onBackground,
             ),
             textAlign: TextAlign.center,
           ),
