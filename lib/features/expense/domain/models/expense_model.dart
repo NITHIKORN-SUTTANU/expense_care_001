@@ -11,6 +11,7 @@ class ExpenseModel {
     required this.date,
     this.isRecurring = false,
     this.recurringId,
+    this.goalId,
     this.syncedToFirestore = true,
     required this.createdAt,
   });
@@ -26,6 +27,8 @@ class ExpenseModel {
   final DateTime date;
   final bool isRecurring;
   final String? recurringId;
+  /// Set when this expense was created by adding money to a goal.
+  final String? goalId;
   final bool syncedToFirestore;
   final DateTime createdAt;
 
@@ -39,11 +42,12 @@ class ExpenseModel {
       categoryId: data['categoryId'] as String,
       note: data['note'] as String?,
       receiptImageUrl: data['receiptImageUrl'] as String?,
-      date: DateTime.parse(data['date'] as String),
+      date: DateTime.parse(data['date'] as String).toLocal(),
       isRecurring: data['isRecurring'] as bool? ?? false,
       recurringId: data['recurringId'] as String?,
+      goalId: data['goalId'] as String?,
       syncedToFirestore: true,
-      createdAt: DateTime.parse(data['createdAt'] as String),
+      createdAt: DateTime.parse(data['createdAt'] as String).toLocal(),
     );
   }
 
@@ -58,6 +62,7 @@ class ExpenseModel {
         'date': date.toIso8601String(),
         'isRecurring': isRecurring,
         'recurringId': recurringId,
+        'goalId': goalId,
         'createdAt': createdAt.toIso8601String(),
       };
 
@@ -70,6 +75,9 @@ class ExpenseModel {
     String? note,
     String? receiptImageUrl,
     DateTime? date,
+    bool? isRecurring,
+    String? recurringId,
+    String? goalId,
     bool? syncedToFirestore,
   }) =>
       ExpenseModel(
@@ -82,8 +90,9 @@ class ExpenseModel {
         note: note ?? this.note,
         receiptImageUrl: receiptImageUrl ?? this.receiptImageUrl,
         date: date ?? this.date,
-        isRecurring: isRecurring,
-        recurringId: recurringId,
+        isRecurring: isRecurring ?? this.isRecurring,
+        recurringId: recurringId ?? this.recurringId,
+        goalId: goalId ?? this.goalId,
         syncedToFirestore: syncedToFirestore ?? this.syncedToFirestore,
         createdAt: createdAt,
       );

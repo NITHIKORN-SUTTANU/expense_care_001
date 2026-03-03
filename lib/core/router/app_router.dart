@@ -80,12 +80,14 @@ final appRouter = GoRouter(
         GoRoute(
           path: AppRoutes.profile,
           builder: (context, state) => const ProfileScreen(),
+          routes: [
+            GoRoute(
+              path: 'recurring',
+              builder: (context, state) => const RecurringExpensesScreen(),
+            ),
+          ],
         ),
       ],
-    ),
-    GoRoute(
-      path: AppRoutes.profileRecurring,
-      builder: (context, state) => const RecurringExpensesScreen(),
     ),
   ],
 );

@@ -44,6 +44,7 @@ class AppColors {
   static const Color catTravel = Color(0xFFFB8C00);
   static const Color catUtilities = Color(0xFF64748B);
   static const Color catGifts = Color(0xFFEC4899);
+  static const Color catSavings = Color(0xFF43A047);
   static const Color catOther = Color(0xFF8B90A7);
 
   static const List<BoxShadow> cardShadow = [

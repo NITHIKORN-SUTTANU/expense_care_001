@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,7 @@ import '../../data/expense_repository.dart';
 import '../../domain/models/expense_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../shared/providers/user_preferences_provider.dart';
+import '../../domain/models/category_model.dart';
 import '../widgets/category_selector.dart';
 
 class AddExpenseScreen extends ConsumerStatefulWidget {
@@ -36,6 +38,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   bool _isLoading = false;
 
   bool get _isEditing => widget.expense != null;
+  bool get _isSavingsEdit =>
+      _isEditing && widget.expense!.categoryId == 'savings';
 
   @override
   void initState() {
@@ -45,7 +49,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _amountCtrl.text = e.amount.toStringAsFixed(2);
       _noteCtrl.text = e.note ?? '';
       _selectedCategoryId = e.categoryId;
-      _selectedDate = e.date;
+      _selectedDate = e.date.toLocal();
     }
   }
 
@@ -90,14 +94,46 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     setState(() => _isLoading = true);
     try {
       if (_isEditing) {
-        final updated = widget.expense!.copyWith(
+        final old = widget.expense!;
+        final updated = old.copyWith(
           amount: amount,
+          currency: currency,
           amountInBaseCurrency: amount,
           categoryId: _selectedCategoryId!,
           note: note,
           date: _selectedDate,
         );
         await repo.update(updated);
+
+        // Sync linked goal when amount or category changes.
+        if (old.goalId != null) {
+          final goalRef = FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .collection('goals')
+              .doc(old.goalId);
+          final snap = await goalRef.get();
+          if (snap.exists) {
+            final data = snap.data()!;
+            final currentSaved =
+                (data['savedAmount'] as num?)?.toDouble() ?? 0.0;
+            final targetAmount = (data['targetAmount'] as num).toDouble();
+            final double newSaved;
+            if (_selectedCategoryId == 'savings') {
+              newSaved = (currentSaved + (amount - old.amountInBaseCurrency))
+                  .clamp(0.0, double.infinity);
+            } else {
+              newSaved = (currentSaved - old.amountInBaseCurrency)
+                  .clamp(0.0, double.infinity);
+            }
+            await goalRef.update({
+              'savedAmount': newSaved,
+              'isCompleted': newSaved >= targetAmount,
+              'updatedAt': DateTime.now().toIso8601String(),
+            });
+          }
+        }
+
         if (mounted) {
           showSuccessSnackBar(context, 'Expense updated!');
           Navigator.of(context).pop();
@@ -158,9 +194,33 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await ref
-          .read(expenseRepositoryProvider)
-          .delete(uid, widget.expense!.id);
+      final expense = widget.expense!;
+      await ref.read(expenseRepositoryProvider).delete(uid, expense.id);
+
+      // Reverse the saved amount on the linked goal.
+      if (expense.categoryId == 'savings' && expense.goalId != null) {
+        final goalRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('goals')
+            .doc(expense.goalId);
+        final snap = await goalRef.get();
+        if (snap.exists) {
+          final data = snap.data()!;
+          final currentSaved =
+              (data['savedAmount'] as num?)?.toDouble() ?? 0.0;
+          final targetAmount = (data['targetAmount'] as num).toDouble();
+          final newSaved =
+              (currentSaved - expense.amountInBaseCurrency)
+                  .clamp(0.0, double.infinity);
+          await goalRef.update({
+            'savedAmount': newSaved,
+            'isCompleted': newSaved >= targetAmount,
+            'updatedAt': DateTime.now().toIso8601String(),
+          });
+        }
+      }
+
       if (mounted) {
         showSuccessSnackBar(context, 'Expense deleted.');
         Navigator.of(context).pop();
@@ -177,34 +237,162 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? AppColors.darkMuted : AppColors.muted;
     final divColor = isDark ? AppColors.darkDivider : AppColors.divider;
-    final currency = ref.watch(userPreferencesNotifierProvider)?.preferredCurrency ?? 'USD';
-    final currencySymbol = NumberFormat.simpleCurrency(name: currency).currencySymbol;
+    final onBg = isDark ? AppColors.darkOnBackground : AppColors.onBackground;
 
+    // Use the expense's own currency for savings edit (locked), otherwise
+    // always use the user's current preferred currency.
+    final currency = _isSavingsEdit
+        ? widget.expense!.currency
+        : (ref.watch(userPreferencesNotifierProvider)?.preferredCurrency ??
+            'USD');
+    final currencySymbol =
+        NumberFormat.simpleCurrency(name: currency).currencySymbol;
+
+    final padding = EdgeInsets.only(
+      left: AppSpacing.md,
+      right: AppSpacing.md,
+      top: AppSpacing.xs,
+      bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
+    );
+
+    // ── Savings edit: simplified read-only view ──────────────────────────────
+    if (_isSavingsEdit) {
+      final expense = widget.expense!;
+      return Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          padding: padding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: AppSpacing.sm),
+
+              // Amount (editable)
+              Text('Amount', style: AppTextStyles.labelLarge(color: onBg)),
+              const SizedBox(height: AppSpacing.xxs),
+              AppTextField(
+                controller: _amountCtrl,
+                hint: '0.00',
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                textInputAction: TextInputAction.done,
+                prefixText: '$currencySymbol ',
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+                ],
+                validator: Validators.amount,
+                onChanged: (_) => setState(() {}),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              // Date (read-only)
+              Text('Date & Time',
+                  style: AppTextStyles.labelLarge(color: muted)),
+              const SizedBox(height: AppSpacing.xxs),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.darkBackground
+                      : AppColors.background,
+                  border: Border.all(color: divColor),
+                  borderRadius: BorderRadius.circular(AppRadius.input),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_today_rounded,
+                        size: 18, color: muted),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        DateFormat('EEE, MMM d · h:mm a')
+                            .format(expense.date.toLocal()),
+                        style: AppTextStyles.bodyMedium(color: muted),
+                      ),
+                    ),
+                    Icon(Icons.lock_outline_rounded, size: 14, color: muted),
+                  ],
+                ),
+              ),
+
+              // Linked goal (read-only)
+              if (expense.goalId != null && expense.note != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text('Linked Goal',
+                    style: AppTextStyles.labelLarge(color: muted)),
+                const SizedBox(height: AppSpacing.xxs),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppColors.darkBackground
+                        : AppColors.background,
+                    border: Border.all(color: divColor),
+                    borderRadius: BorderRadius.circular(AppRadius.input),
+                  ),
+                  child: Row(
+                    children: [
+                      const Text('🎯', style: TextStyle(fontSize: 16)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          expense.note!,
+                          style: AppTextStyles.bodyMedium(color: muted),
+                        ),
+                      ),
+                      Icon(Icons.lock_outline_rounded,
+                          size: 14, color: muted),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: AppSpacing.lg),
+
+              OutlinedButton(
+                onPressed: _isLoading ? null : _delete,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
+                child: const Text('Delete Expense'),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              AppButton(
+                label: 'Save Changes',
+                onPressed: _canSubmit && !_isLoading ? _submit : null,
+                isLoading: _isLoading,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ── Regular add / edit form ──────────────────────────────────────────────
     return Form(
       key: _formKey,
       child: SingleChildScrollView(
-        padding: EdgeInsets.only(
-          left: AppSpacing.md,
-          right: AppSpacing.md,
-          top: AppSpacing.xs,
-          bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
-        ),
+        padding: padding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── Amount ──────────────────────────────────────────────────
+            // ── Amount ────────────────────────────────────────────────────
             const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Amount',
-              style: AppTextStyles.labelLarge(
-                color: isDark ? AppColors.darkOnBackground : AppColors.onBackground,
-              ),
-            ),
+            Text('Amount', style: AppTextStyles.labelLarge(color: onBg)),
             const SizedBox(height: AppSpacing.xxs),
             AppTextField(
               controller: _amountCtrl,
               hint: '0.00',
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
               prefixText: '$currencySymbol ',
               inputFormatters: [
@@ -216,36 +404,21 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
             const SizedBox(height: AppSpacing.md),
 
-            // ── Category ────────────────────────────────────────────────
-            Text(
-              'Category',
-              style: AppTextStyles.labelLarge(
-                color: isDark ? AppColors.darkOnBackground : AppColors.onBackground,
-              ),
-            ),
+            // ── Category ──────────────────────────────────────────────────
+            Text('Category', style: AppTextStyles.labelLarge(color: onBg)),
             const SizedBox(height: AppSpacing.xxs),
             CategorySelector(
               selectedId: _selectedCategoryId,
               onSelected: (id) => setState(() => _selectedCategoryId = id),
+              categories: CategoryModel.defaults
+                  .where((c) => c.id != 'savings')
+                  .toList(),
             ),
-            if (_selectedCategoryId == null && _formKey.currentState != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4, left: 4),
-                child: Text(
-                  'Please select a category',
-                  style: AppTextStyles.labelSmall(color: AppColors.error),
-                ),
-              ),
 
             const SizedBox(height: AppSpacing.md),
 
-            // ── Date & Time ──────────────────────────────────────────────
-            Text(
-              'Date & Time',
-              style: AppTextStyles.labelLarge(
-                color: isDark ? AppColors.darkOnBackground : AppColors.onBackground,
-              ),
-            ),
+            // ── Date & Time ───────────────────────────────────────────────
+            Text('Date & Time', style: AppTextStyles.labelLarge(color: onBg)),
             const SizedBox(height: AppSpacing.xxs),
             GestureDetector(
               onTap: _pickDate,
@@ -260,15 +433,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.calendar_today_rounded, size: 18, color: muted),
+                    Icon(Icons.calendar_today_rounded,
+                        size: 18, color: muted),
                     const SizedBox(width: 10),
                     Text(
-                      DateFormat('EEE, MMM d · h:mm a').format(_selectedDate),
-                      style: AppTextStyles.bodyMedium(
-                        color: isDark
-                            ? AppColors.darkOnBackground
-                            : AppColors.onBackground,
-                      ),
+                      DateFormat('EEE, MMM d · h:mm a')
+                          .format(_selectedDate),
+                      style: AppTextStyles.bodyMedium(color: onBg),
                     ),
                   ],
                 ),
@@ -277,13 +448,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
             const SizedBox(height: AppSpacing.md),
 
-            // ── Note ─────────────────────────────────────────────────────
-            Text(
-              'Note (optional)',
-              style: AppTextStyles.labelLarge(
-                color: isDark ? AppColors.darkOnBackground : AppColors.onBackground,
-              ),
-            ),
+            // ── Note ──────────────────────────────────────────────────────
+            Text('Note (optional)',
+                style: AppTextStyles.labelLarge(color: onBg)),
             const SizedBox(height: AppSpacing.xxs),
             AppTextField(
               controller: _noteCtrl,
@@ -295,7 +462,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
             const SizedBox(height: AppSpacing.lg),
 
-            // ── Submit ───────────────────────────────────────────────────
+            // ── Submit ────────────────────────────────────────────────────
             if (_isEditing) ...[
               OutlinedButton(
                 onPressed: _isLoading ? null : _delete,

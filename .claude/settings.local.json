@@ -3,7 +3,8 @@
     "allow": [
       "Bash(flutter analyze lib/features/summary/presentation/screens/summary_screen.dart lib/features/expense/data/expense_repository.dart)",
       "Bash(flutter analyze lib/)",
-      "Bash(flutter analyze)"
+      "Bash(flutter analyze)",
+      "Bash(flutter pub get)"
     ]
   }
 }

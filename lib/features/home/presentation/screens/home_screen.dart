@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,18 +10,46 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../shared/providers/connectivity_provider.dart';
 import '../../../../shared/providers/user_preferences_provider.dart';
 import '../../../../shared/widgets/app_bottom_sheet.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../expense/data/expense_repository.dart';
 import '../../../expense/domain/models/expense_model.dart';
 import '../../../expense/presentation/screens/add_expense_screen.dart';
 import '../../../profile/presentation/widgets/budget_limit_form.dart';
+import '../../../recurring/domain/models/recurring_expense_model.dart';
 import '../widgets/daily_budget_card.dart';
 import '../widgets/optional_budget_cards.dart';
 import '../widgets/recent_expenses_list.dart';
 
-class HomeScreen extends ConsumerWidget {
+DateTime _nextDue(String frequency, DateTime base) => switch (frequency) {
+      'daily' => base.add(const Duration(days: 1)),
+      'weekly' => base.add(const Duration(days: 7)),
+      'monthly' => _addMonths(base, 1),
+      'yearly' => _addMonths(base, 12),
+      _ => base,
+    };
+
+/// Advances [base] by [months], clamping the day to the last valid day of
+/// the target month (e.g. Jan 31 + 1 month → Feb 28/29, not Mar 2/3).
+DateTime _addMonths(DateTime base, int months) {
+  final totalMonth = base.month - 1 + months;
+  final year = base.year + totalMonth ~/ 12;
+  final month = totalMonth % 12 + 1;
+  final lastDay = DateTime(year, month + 1, 0).day; // day 0 = last of prev month
+  return DateTime(year, month, base.day.clamp(1, lastDay));
+}
+
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _recurringChecked = false;
 
   String get _greeting {
     final hour = DateTime.now().hour;
@@ -38,6 +68,15 @@ class HomeScreen extends ConsumerWidget {
     return '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
   }
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) _runRecurringCheck(uid);
+    });
+  }
+
   void _openAddExpense(BuildContext context) {
     showAppBottomSheet(
       context: context,
@@ -54,7 +93,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  void _openBudgetSetup(BuildContext context, WidgetRef ref) {
+  void _openBudgetSetup(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -63,8 +102,83 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _runRecurringCheck(String uid) async {
+    if (_recurringChecked) return;
+    _recurringChecked = true;
+    try {
+      final now = DateTime.now();
+
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('recurring')
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      if (snap.docs.isEmpty) return;
+
+      final batch = FirebaseFirestore.instance.batch();
+      bool hasWork = false;
+
+      for (final doc in snap.docs) {
+        final item = RecurringExpenseModel.fromMap(doc.data(), doc.id);
+        var due = item.nextDueDate;
+
+        // Skip if nothing is due yet
+        if (due.isAfter(now)) continue;
+
+        // Create one expense per missed occurrence
+        while (!due.isAfter(now)) {
+          final expRef = FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .collection('expenses')
+              .doc('${item.id}_${due.millisecondsSinceEpoch}');
+
+          batch.set(
+            expRef,
+            {
+              'userId': uid,
+              'amount': item.amount,
+              'currency': item.currency,
+              'amountInBaseCurrency': item.amount,
+              'categoryId': item.categoryId,
+              'note': item.note ?? item.name,
+              'date': due.toIso8601String(),
+              'isRecurring': true,
+              'recurringId': item.id,
+              'goalId': null,
+              'receiptImageUrl': null,
+              'syncedToFirestore': true,
+              'createdAt': now.toIso8601String(),
+            },
+            SetOptions(merge: false),
+          );
+
+          due = _nextDue(item.frequency, due);
+          hasWork = true;
+        }
+
+        // Advance nextDueDate to the next future occurrence
+        batch.update(doc.reference, {'nextDueDate': due.toIso8601String()});
+      }
+
+      if (hasWork) await batch.commit();
+    } catch (_) {
+      // Allow retry next time the widget mounts if something went wrong
+      _recurringChecked = false;
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    // Trigger check when auth resolves after mount (e.g. cold start)
+    ref.listen<AsyncValue<User?>>(authStateProvider, (_, next) {
+      next.whenData((user) {
+        if (user != null) _runRecurringCheck(user.uid);
+      });
+    });
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final user = ref.watch(userPreferencesNotifierProvider);
@@ -87,6 +201,7 @@ class HomeScreen extends ConsumerWidget {
     final budgetReady = userLoaded && dailyBudget > 0;
 
     final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
+    final isOnline = ref.watch(isOnlineProvider);
 
     return Scaffold(
       floatingActionButton: budgetReady
@@ -131,25 +246,38 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            actions: [
-              IconButton(
-                onPressed: () {},
-                icon: Icon(
-                  Icons.notifications_none_rounded,
-                  color: isDark
-                      ? AppColors.darkOnBackground
-                      : AppColors.onBackground,
-                ),
-                tooltip: 'Notifications',
-              ),
-              const SizedBox(width: 4),
-            ],
+            actions: const [SizedBox(width: 4)],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
               child: Divider(
                 height: 1,
                 color: isDark ? AppColors.darkDivider : AppColors.divider,
               ),
+            ),
+          ),
+
+          // ── Offline banner ───────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              height: isOnline ? 0 : 36,
+              color: isDark ? AppColors.darkWarning : AppColors.warning,
+              child: isOnline
+                  ? null
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.wifi_off_rounded,
+                            size: 14, color: Colors.white),
+                        const SizedBox(width: 6),
+                        Text(
+                          'No internet connection',
+                          style: AppTextStyles.labelSmall(
+                              color: Colors.white),
+                        ),
+                      ],
+                    ),
             ),
           ),
 
@@ -162,7 +290,7 @@ class HomeScreen extends ConsumerWidget {
             SliverFillRemaining(
               child: _BudgetSetupPrompt(
                 isDark: isDark,
-                onSetUp: () => _openBudgetSetup(context, ref),
+                onSetUp: () => _openBudgetSetup(context),
               ),
             )
           else

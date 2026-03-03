@@ -274,29 +274,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  void _handleDeleteAccount() {
-    showDialog(
+  Future<void> _handleDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
       context: context,
       useRootNavigator: false,
-      builder: (dialogContext) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Delete Account'),
         content: const Text(
           'This will permanently delete your account and all data. This action cannot be undone.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await ref.read(authRepositoryProvider).deleteAccount();
-            },
+            onPressed: () => Navigator.pop(ctx, true),
             child: Text(
               'Delete',
               style: TextStyle(
-                color: Theme.of(dialogContext).brightness == Brightness.dark
+                color: Theme.of(ctx).brightness == Brightness.dark
                     ? AppColors.darkError
                     : AppColors.error,
                 fontWeight: FontWeight.w700,
@@ -306,6 +303,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+
+    // Show non-dismissible loading spinner while deleting.
+    showDialog(
+      context: context,
+      useRootNavigator: false,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    );
+
+    try {
+      await ref.read(authRepositoryProvider).deleteAccount();
+      // GoRouter redirects to /login automatically via auth state change.
+    } catch (_) {
+      if (!mounted) return;
+      Navigator.pop(context); // dismiss spinner
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to delete account. Please try again.'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.chip)),
+          margin: const EdgeInsets.all(AppSpacing.sm),
+        ),
+      );
+    }
   }
 
   @override
@@ -483,19 +510,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           color: isDark ? AppColors.darkMuted : AppColors.muted,
                         ),
                         onTap: () => context.push(AppRoutes.profileRecurring),
-                        showDivider: true,
-                      ),
-                      _ListTile(
-                        label: 'Export Data',
-                        subtitle: 'Coming in v1.1',
-                        isDark: isDark,
-                        leading:
-                            const Text('📊', style: TextStyle(fontSize: 20)),
-                        trailing: Icon(
-                          Icons.chevron_right_rounded,
-                          color: isDark ? AppColors.darkMuted : AppColors.muted,
-                        ),
-                        enabled: false,
                         showDivider: false,
                       ),
                     ],
@@ -666,7 +680,6 @@ class _ListTile extends StatelessWidget {
     this.leading,
     this.onTap,
     this.labelColor,
-    this.enabled = true,
     required this.showDivider,
   });
 
@@ -677,7 +690,6 @@ class _ListTile extends StatelessWidget {
   final Widget? leading;
   final VoidCallback? onTap;
   final Color? labelColor;
-  final bool enabled;
   final bool showDivider;
 
   @override
@@ -689,10 +701,8 @@ class _ListTile extends StatelessWidget {
     return Column(
       children: [
         InkWell(
-          onTap: enabled ? onTap : null,
-          child: Opacity(
-            opacity: enabled ? 1.0 : 0.5,
-            child: Padding(
+          onTap: onTap,
+          child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.sm,
                 vertical: 14,
@@ -732,7 +742,6 @@ class _ListTile extends StatelessWidget {
               ),
             ),
           ),
-        ),
         if (showDivider)
           Divider(
             height: 1,

@@ -35,6 +35,12 @@ dependencies:
   # Connectivity
   connectivity_plus: ^6.0.3
 
+  # Notifications
+  flutter_local_notifications: ^17.0.0
+
+  # Local key-value storage
+  shared_preferences: ^2.3.0
+
   # Image
   image_picker: ^1.1.2
   flutter_image_compress: ^2.2.0

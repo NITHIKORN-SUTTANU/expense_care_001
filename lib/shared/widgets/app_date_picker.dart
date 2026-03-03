@@ -91,8 +91,8 @@ class _SingleDateSheetState extends State<_SingleDateSheet> {
   @override
   void initState() {
     super.initState();
-    _selected = widget.initialDate;
-    _display = DateTime(widget.initialDate.year, widget.initialDate.month);
+    _selected = widget.initialDate.toLocal();
+    _display = DateTime(_selected.year, _selected.month);
   }
 
   bool get _canPrev => _display

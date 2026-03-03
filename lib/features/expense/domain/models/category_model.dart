@@ -85,6 +85,12 @@ class CategoryModel {
       color: AppColors.catGifts,
     ),
     CategoryModel(
+      id: 'savings',
+      name: 'Savings',
+      emoji: '💰',
+      color: AppColors.catSavings,
+    ),
+    CategoryModel(
       id: 'other',
       name: 'Other',
       emoji: '📦',
