@@ -8,6 +8,7 @@ class ExpenseModel {
     required this.categoryId,
     this.note,
     this.receiptImageUrl,
+    this.receiptBase64,
     required this.date,
     this.isRecurring = false,
     this.recurringId,
@@ -23,7 +24,10 @@ class ExpenseModel {
   final double amountInBaseCurrency;
   final String categoryId;
   final String? note;
+  /// Legacy: Firebase Storage download URL. Kept for backward-compat display.
   final String? receiptImageUrl;
+  /// Base64-encoded JPEG receipt image stored directly on the document.
+  final String? receiptBase64;
   final DateTime date;
   final bool isRecurring;
   final String? recurringId;
@@ -42,6 +46,7 @@ class ExpenseModel {
       categoryId: data['categoryId'] as String,
       note: data['note'] as String?,
       receiptImageUrl: data['receiptImageUrl'] as String?,
+      receiptBase64: data['receiptBase64'] as String?,
       date: DateTime.parse(data['date'] as String).toLocal(),
       isRecurring: data['isRecurring'] as bool? ?? false,
       recurringId: data['recurringId'] as String?,
@@ -59,6 +64,7 @@ class ExpenseModel {
         'categoryId': categoryId,
         'note': note,
         'receiptImageUrl': receiptImageUrl,
+        'receiptBase64': receiptBase64,
         'date': date.toIso8601String(),
         'isRecurring': isRecurring,
         'recurringId': recurringId,
@@ -74,10 +80,9 @@ class ExpenseModel {
     String? categoryId,
     String? note,
     String? receiptImageUrl,
-    // Set to true to explicitly clear the receipt URL (setting to null).
-    // Needed because `receiptImageUrl: null` alone is indistinguishable from
-    // "not provided" when using the ?? coalescing pattern.
-    bool clearReceiptUrl = false,
+    String? receiptBase64,
+    // Set true to explicitly wipe both receipt fields (remove receipt).
+    bool clearReceipt = false,
     DateTime? date,
     bool? isRecurring,
     String? recurringId,
@@ -93,7 +98,9 @@ class ExpenseModel {
         categoryId: categoryId ?? this.categoryId,
         note: note ?? this.note,
         receiptImageUrl:
-            clearReceiptUrl ? null : (receiptImageUrl ?? this.receiptImageUrl),
+            clearReceipt ? null : (receiptImageUrl ?? this.receiptImageUrl),
+        receiptBase64:
+            clearReceipt ? null : (receiptBase64 ?? this.receiptBase64),
         date: date ?? this.date,
         isRecurring: isRecurring ?? this.isRecurring,
         recurringId: recurringId ?? this.recurringId,

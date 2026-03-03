@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -41,8 +41,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   String? _selectedCategoryId;
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
-  File? _pickedReceipt;
+  Uint8List? _pickedReceiptBytes;  // newly picked image (encoded to Base64 on save)
+  Uint8List? _existingReceiptBytes; // pre-decoded from expense.receiptBase64 in initState
   bool _receiptRemoved = false;
+
+  // 500 KB raw → ~666 KB as Base64, comfortably within Firestore's 1 MB doc limit.
+  static const _maxImageBytes = 500 * 1024;
 
   bool get _isEditing => widget.expense != null;
   bool get _isSavingsEdit =>
@@ -57,6 +61,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _noteCtrl.text = e.note ?? '';
       _selectedCategoryId = e.categoryId;
       _selectedDate = e.date.toLocal();
+      // Decode once here so _buildReceiptSection never calls base64Decode during build.
+      if (e.receiptBase64 != null) {
+        _existingReceiptBytes = base64Decode(e.receiptBase64!);
+      }
     }
   }
 
@@ -84,10 +92,20 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   Future<void> _pickReceipt(ImageSource source) async {
     try {
-      final file = await ReceiptService.instance.pick(source);
-      if (file == null || !mounted) return;
+      final xfile = await ReceiptService.instance.pick(source);
+      if (xfile == null || !mounted) return;
+      final bytes = await xfile.readAsBytes();
+      if (!mounted) return;
+      if (bytes.length > _maxImageBytes) {
+        showErrorSnackBar(
+          context,
+          'Image is too large (${(bytes.length / 1024).round()} KB). '
+          'Please choose a smaller image or reduce the resolution.',
+        );
+        return;
+      }
       setState(() {
-        _pickedReceipt = file;
+        _pickedReceiptBytes = bytes;
         _receiptRemoved = false;
       });
     } catch (e) {
@@ -95,16 +113,20 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     }
   }
 
-  Widget _buildReceiptSection(bool isDark, Color muted, Color divColor) {
-    final existingUrl =
+  Widget _buildReceiptSection(Color muted, Color divColor) {
+    // Priority: newly picked > pre-decoded existing base64 > legacy Storage URL.
+    // _existingReceiptBytes is decoded once in initState, not on every build.
+    final displayBytes = _pickedReceiptBytes ??
+        (_receiptRemoved ? null : _existingReceiptBytes);
+    final legacyUrl =
         _receiptRemoved ? null : widget.expense?.receiptImageUrl;
-    final hasReceipt = _pickedReceipt != null || existingUrl != null;
+    final hasReceipt = displayBytes != null || legacyUrl != null;
     if (hasReceipt) {
       return _ReceiptThumbnail(
-        file: _pickedReceipt,
-        url: existingUrl,
+        bytes: displayBytes,
+        url: legacyUrl,
         onRemove: () => setState(() {
-          _pickedReceipt = null;
+          _pickedReceiptBytes = null;
           _receiptRemoved = true;
         }),
       );
@@ -131,24 +153,19 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '')) ?? 0;
     final note = _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim();
     final repo = ref.read(expenseRepositoryProvider);
-    // Determine ID upfront — needed for the Storage upload path.
+    // Determine ID upfront so the new expense has a stable ID before saving.
     final expenseId = _isEditing
         ? widget.expense!.id
         : DateTime.now().millisecondsSinceEpoch.toString();
 
     setState(() => _isLoading = true);
     try {
-      // ── Receipt handling ────────────────────────────────────────────────────
-      String? receiptUrl;
-      if (_pickedReceipt != null) {
-        receiptUrl = await ReceiptService.instance
-            .upload(uid, expenseId, _pickedReceipt!);
-      } else if (_receiptRemoved) {
-        await ReceiptService.instance.delete(uid, expenseId);
-        // receiptUrl stays null
-      } else {
-        receiptUrl = _isEditing ? widget.expense!.receiptImageUrl : null;
-      }
+      // ── Receipt (Base64 on Firestore, no Firebase Storage) ──────────────────
+      // When clearReceipt:false and receiptBase64:null, copyWith preserves the
+      // existing value — so we only need to encode when a new image was picked.
+      final newReceiptBase64 = _pickedReceiptBytes != null
+          ? base64Encode(_pickedReceiptBytes!)
+          : null;
 
       if (_isEditing) {
         final old = widget.expense!;
@@ -158,8 +175,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           amountInBaseCurrency: amount,
           categoryId: _selectedCategoryId!,
           note: note,
-          receiptImageUrl: receiptUrl,
-          clearReceiptUrl: _receiptRemoved,
+          receiptBase64: newReceiptBase64,
+          clearReceipt: _receiptRemoved,
           date: _selectedDate,
         );
         await repo.update(updated);
@@ -206,7 +223,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           amountInBaseCurrency: amount,
           categoryId: _selectedCategoryId!,
           note: note,
-          receiptImageUrl: receiptUrl,
+          receiptBase64: newReceiptBase64,
           date: _selectedDate,
           syncedToFirestore: true,
           createdAt: DateTime.now(),
@@ -526,7 +543,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             Text('Receipt (optional)',
                 style: AppTextStyles.labelLarge(color: onBg)),
             const SizedBox(height: AppSpacing.xxs),
-            _buildReceiptSection(isDark, muted, divColor),
+            _buildReceiptSection(muted, divColor),
 
             const SizedBox(height: AppSpacing.lg),
 
@@ -558,23 +575,23 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   }
 }
 
-// ── Receipt thumbnail (shows picked file or existing network image) ───────────
+// ── Receipt thumbnail (shows in-memory bytes or legacy network URL) ──────────
 
 class _ReceiptThumbnail extends StatelessWidget {
   const _ReceiptThumbnail({
-    required this.file,
+    required this.bytes,
     required this.url,
     required this.onRemove,
   });
 
-  final File? file;
+  final Uint8List? bytes;
   final String? url;
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
-    final imageWidget = file != null
-        ? Image.file(file!, fit: BoxFit.cover, width: double.infinity)
+    final imageWidget = bytes != null
+        ? Image.memory(bytes!, fit: BoxFit.cover, width: double.infinity)
         : CachedNetworkImage(
             imageUrl: url!,
             fit: BoxFit.cover,
@@ -628,13 +645,13 @@ class _ReceiptThumbnail extends StatelessWidget {
   }
 
   void _openViewer(BuildContext context) {
-    final imageProvider = file != null
-        ? FileImage(file!) as ImageProvider
+    final imageProvider = bytes != null
+        ? MemoryImage(bytes!) as ImageProvider
         : CachedNetworkImageProvider(url!);
 
     showDialog<void>(
       context: context,
-      builder: (_) => Dialog(
+      builder: (dialogContext) => Dialog(
         backgroundColor: Colors.black,
         insetPadding: EdgeInsets.zero,
         child: Stack(
@@ -648,7 +665,8 @@ class _ReceiptThumbnail extends StatelessWidget {
               child: Material(
                 color: Colors.transparent,
                 child: IconButton(
-                  onPressed: () => Navigator.pop(context),
+                  // Use the dialog's own context so we always pop the correct route.
+                  onPressed: () => Navigator.pop(dialogContext),
                   icon: const Icon(
                     Icons.close,
                     color: Colors.white,
