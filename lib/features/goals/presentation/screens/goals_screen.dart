@@ -34,6 +34,14 @@ final goalsProvider = StreamProvider<List<GoalModel>>((ref) {
       .map((s) => s.docs.map((d) => GoalModel.fromMap(d.data(), d.id)).toList());
 });
 
+/// Converts a stored goal icon string (codePoint) back to an [IconData].
+/// Falls back to [Icons.flag_rounded] for legacy emoji data or invalid values.
+IconData _goalIconData(String stored) {
+  final cp = int.tryParse(stored);
+  if (cp != null) return IconData(cp, fontFamily: 'MaterialIcons');
+  return Icons.flag_rounded;
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class GoalsScreen extends ConsumerWidget {
@@ -107,7 +115,7 @@ class GoalsScreen extends ConsumerWidget {
           if (goals.isEmpty)
             SliverFillRemaining(
               child: EmptyState(
-                emoji: '🎯',
+                icon: Icons.flag_rounded,
                 title: 'No goals yet',
                 subtitle: 'Set your first goal and start saving!',
                 actionLabel: 'Add Goal',
@@ -203,8 +211,11 @@ class _GoalCard extends StatelessWidget {
                       valueColor:
                           AlwaysStoppedAnimation<Color>(progressColor),
                     ),
-                    Text(goal.emoji,
-                        style: const TextStyle(fontSize: 22)),
+                    Icon(
+                      _goalIconData(goal.emoji),
+                      size: 22,
+                      color: progressColor,
+                    ),
                   ],
                 ),
               ),
@@ -256,7 +267,8 @@ class _GoalCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (goal.isCompleted)
-                    const Text('🎉', style: TextStyle(fontSize: 22))
+                    const Icon(Icons.check_circle_rounded,
+                        size: 22, color: AppColors.success)
                   else ...[
                     Text(
                       '${goal.progressPercent}%',
@@ -319,10 +331,25 @@ class _GoalFormSheetState extends ConsumerState<_GoalFormSheet> {
 
   bool get _isEditing => widget.goal != null;
 
-  static const _emojis = [
-    '🎯', '🏠', '✈️', '💻', '🚗', '📱',
-    '🎓', '💎', '🛡️', '🎮', '📷', '🌴',
-    '👟', '🎵', '🏋️', '🐾', '🛒', '💍',
+  static const _goalIcons = [
+    Icons.flag_rounded,
+    Icons.home_rounded,
+    Icons.flight_rounded,
+    Icons.laptop_rounded,
+    Icons.directions_car_rounded,
+    Icons.smartphone_rounded,
+    Icons.school_rounded,
+    Icons.diamond_rounded,
+    Icons.security_rounded,
+    Icons.sports_esports_rounded,
+    Icons.photo_camera_rounded,
+    Icons.park_rounded,
+    Icons.directions_walk_rounded,
+    Icons.music_note_rounded,
+    Icons.fitness_center_rounded,
+    Icons.pets_rounded,
+    Icons.shopping_cart_rounded,
+    Icons.favorite_rounded,
   ];
 
   @override
@@ -336,7 +363,7 @@ class _GoalFormSheetState extends ConsumerState<_GoalFormSheet> {
               g.targetAmount == g.targetAmount.truncate() ? 0 : 2)
           : '',
     );
-    _emoji = g?.emoji ?? '🎯';
+    _emoji = g?.emoji ?? Icons.flag_rounded.codePoint.toString();
     _targetDate = g?.targetDate;
   }
 
@@ -534,10 +561,11 @@ class _GoalFormSheetState extends ConsumerState<_GoalFormSheet> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _emojis.map((e) {
-                final selected = e == _emoji;
+              children: _goalIcons.map((iconData) {
+                final selected = iconData.codePoint.toString() == _emoji;
                 return GestureDetector(
-                  onTap: () => setState(() => _emoji = e),
+                  onTap: () => setState(
+                      () => _emoji = iconData.codePoint.toString()),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     width: 46,
@@ -553,8 +581,11 @@ class _GoalFormSheetState extends ConsumerState<_GoalFormSheet> {
                       ),
                     ),
                     child: Center(
-                      child:
-                          Text(e, style: const TextStyle(fontSize: 22)),
+                      child: Icon(
+                        iconData,
+                        size: 22,
+                        color: selected ? primary : onBg,
+                      ),
                     ),
                   ),
                 );
@@ -797,8 +828,8 @@ class _AddMoneySheetState extends ConsumerState<_AddMoneySheet> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('💰',
-                      style: TextStyle(fontSize: 16)),
+                  Icon(Icons.info_outline_rounded,
+                      size: 16, color: primary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(

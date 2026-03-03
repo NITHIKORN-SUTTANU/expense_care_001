@@ -130,7 +130,7 @@ class _ExpenseRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final category = CategoryModel.findById(expense.categoryId);
     final catColor = category?.color ?? AppColors.catOther;
-    final catEmoji = category?.emoji ?? '📦';
+    final catIcon = category?.icon ?? Icons.category_rounded;
     final catName = category?.name ?? 'Other';
 
     return InkWell(
@@ -148,7 +148,7 @@ class _ExpenseRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Center(
-                child: Text(catEmoji, style: const TextStyle(fontSize: 20)),
+                child: Icon(catIcon, size: 20, color: catColor),
               ),
             ),
 
@@ -211,7 +211,11 @@ class _EmptyState extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 32),
         child: Column(
           children: [
-            const Text('💸', style: TextStyle(fontSize: 48)),
+            Icon(
+              Icons.receipt_long_rounded,
+              size: 48,
+              color: isDark ? AppColors.darkMuted : AppColors.muted,
+            ),
             const SizedBox(height: 12),
             Text(
               'No expenses yet.',

@@ -49,7 +49,13 @@ class CategorySelector extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(cat.emoji, style: const TextStyle(fontSize: 22)),
+                Icon(
+                  cat.icon,
+                  size: 22,
+                  color: selected
+                      ? primary
+                      : (isDark ? AppColors.darkOnSurface : AppColors.onSurface),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   cat.name.split(' ').first,

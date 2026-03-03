@@ -358,7 +358,11 @@ class _BudgetSetupPrompt extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text('💰', style: TextStyle(fontSize: 64)),
+          Icon(
+            Icons.account_balance_wallet_rounded,
+            size: 64,
+            color: primary,
+          ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Set your budget first',

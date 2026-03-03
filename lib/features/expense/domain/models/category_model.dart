@@ -5,14 +5,14 @@ class CategoryModel {
   const CategoryModel({
     required this.id,
     required this.name,
-    required this.emoji,
+    required this.icon,
     required this.color,
     this.isDefault = true,
   });
 
   final String id;
   final String name;
-  final String emoji;
+  final IconData icon;
   final Color color;
   final bool isDefault;
 
@@ -21,79 +21,79 @@ class CategoryModel {
     CategoryModel(
       id: 'food',
       name: 'Food & Drink',
-      emoji: '🍔',
+      icon: Icons.restaurant_rounded,
       color: AppColors.catFood,
     ),
     CategoryModel(
       id: 'transport',
       name: 'Transport',
-      emoji: '🚗',
+      icon: Icons.directions_car_rounded,
       color: AppColors.catTransport,
     ),
     CategoryModel(
       id: 'housing',
       name: 'Housing',
-      emoji: '🏠',
+      icon: Icons.home_rounded,
       color: AppColors.catHousing,
     ),
     CategoryModel(
       id: 'health',
       name: 'Health',
-      emoji: '💊',
+      icon: Icons.medical_services_rounded,
       color: AppColors.catHealth,
     ),
     CategoryModel(
       id: 'shopping',
       name: 'Shopping',
-      emoji: '🛍',
+      icon: Icons.shopping_bag_rounded,
       color: AppColors.catShopping,
     ),
     CategoryModel(
       id: 'entertainment',
       name: 'Entertainment',
-      emoji: '🎮',
+      icon: Icons.sports_esports_rounded,
       color: AppColors.catEntertainment,
     ),
     CategoryModel(
       id: 'education',
       name: 'Education',
-      emoji: '📚',
+      icon: Icons.school_rounded,
       color: AppColors.catEducation,
     ),
     CategoryModel(
       id: 'work',
       name: 'Work',
-      emoji: '💼',
+      icon: Icons.work_rounded,
       color: AppColors.catWork,
     ),
     CategoryModel(
       id: 'travel',
       name: 'Travel',
-      emoji: '✈️',
+      icon: Icons.flight_rounded,
       color: AppColors.catTravel,
     ),
     CategoryModel(
       id: 'utilities',
       name: 'Utilities',
-      emoji: '🔧',
+      icon: Icons.build_rounded,
       color: AppColors.catUtilities,
     ),
     CategoryModel(
       id: 'gifts',
       name: 'Gifts',
-      emoji: '🎁',
+      icon: Icons.card_giftcard_rounded,
       color: AppColors.catGifts,
     ),
     CategoryModel(
       id: 'savings',
       name: 'Savings',
-      emoji: '💰',
+      icon: Icons.savings_rounded,
       color: AppColors.catSavings,
     ),
     CategoryModel(
       id: 'other',
       name: 'Other',
-      emoji: '📦',
+      icon: Icons.category_rounded,
       color: AppColors.catOther,
     ),
   ];

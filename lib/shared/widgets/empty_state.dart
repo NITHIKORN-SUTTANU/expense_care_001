@@ -6,14 +6,14 @@ import '../../core/constants/app_text_styles.dart';
 class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,
-    required this.emoji,
+    required this.icon,
     required this.title,
     required this.subtitle,
     this.actionLabel,
     this.onAction,
   });
 
-  final String emoji;
+  final IconData icon;
   final String title;
   final String subtitle;
   final String? actionLabel;
@@ -30,7 +30,7 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 64)),
+            Icon(icon, size: 64, color: isDark ? AppColors.darkMuted : AppColors.muted),
             const SizedBox(height: AppSpacing.sm),
             Text(
               title,

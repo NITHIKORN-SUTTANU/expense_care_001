@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -114,17 +113,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   }
 
   Widget _buildReceiptSection(Color muted, Color divColor) {
-    // Priority: newly picked > pre-decoded existing base64 > legacy Storage URL.
-    // _existingReceiptBytes is decoded once in initState, not on every build.
+    // Priority: newly picked > pre-decoded existing base64 (decoded in initState).
     final displayBytes = _pickedReceiptBytes ??
         (_receiptRemoved ? null : _existingReceiptBytes);
-    final legacyUrl =
-        _receiptRemoved ? null : widget.expense?.receiptImageUrl;
-    final hasReceipt = displayBytes != null || legacyUrl != null;
-    if (hasReceipt) {
+    if (displayBytes != null) {
       return _ReceiptThumbnail(
         bytes: displayBytes,
-        url: legacyUrl,
         onRemove: () => setState(() {
           _pickedReceiptBytes = null;
           _receiptRemoved = true;
@@ -412,7 +406,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Text('🎯', style: TextStyle(fontSize: 16)),
+                      const Icon(Icons.flag_rounded, size: 18),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -575,28 +569,21 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   }
 }
 
-// ── Receipt thumbnail (shows in-memory bytes or legacy network URL) ──────────
+// ── Receipt thumbnail ─────────────────────────────────────────────────────────
 
 class _ReceiptThumbnail extends StatelessWidget {
   const _ReceiptThumbnail({
     required this.bytes,
-    required this.url,
     required this.onRemove,
   });
 
-  final Uint8List? bytes;
-  final String? url;
+  final Uint8List bytes;
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
-    final imageWidget = bytes != null
-        ? Image.memory(bytes!, fit: BoxFit.cover, width: double.infinity)
-        : CachedNetworkImage(
-            imageUrl: url!,
-            fit: BoxFit.cover,
-            width: double.infinity,
-          );
+    final imageWidget =
+        Image.memory(bytes, fit: BoxFit.cover, width: double.infinity);
 
     return GestureDetector(
       onTap: () => _openViewer(context),
@@ -645,9 +632,7 @@ class _ReceiptThumbnail extends StatelessWidget {
   }
 
   void _openViewer(BuildContext context) {
-    final imageProvider = bytes != null
-        ? MemoryImage(bytes!) as ImageProvider
-        : CachedNetworkImageProvider(url!);
+    final imageProvider = MemoryImage(bytes);
 
     showDialog<void>(
       context: context,

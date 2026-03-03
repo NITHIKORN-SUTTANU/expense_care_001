@@ -7,7 +7,6 @@ class ExpenseModel {
     required this.amountInBaseCurrency,
     required this.categoryId,
     this.note,
-    this.receiptImageUrl,
     this.receiptBase64,
     required this.date,
     this.isRecurring = false,
@@ -24,9 +23,7 @@ class ExpenseModel {
   final double amountInBaseCurrency;
   final String categoryId;
   final String? note;
-  /// Legacy: Firebase Storage download URL. Kept for backward-compat display.
-  final String? receiptImageUrl;
-  /// Base64-encoded JPEG receipt image stored directly on the document.
+  /// Base64-encoded JPEG receipt image stored directly on the Firestore document.
   final String? receiptBase64;
   final DateTime date;
   final bool isRecurring;
@@ -45,7 +42,6 @@ class ExpenseModel {
       amountInBaseCurrency: (data['amountInBaseCurrency'] as num).toDouble(),
       categoryId: data['categoryId'] as String,
       note: data['note'] as String?,
-      receiptImageUrl: data['receiptImageUrl'] as String?,
       receiptBase64: data['receiptBase64'] as String?,
       date: DateTime.parse(data['date'] as String).toLocal(),
       isRecurring: data['isRecurring'] as bool? ?? false,
@@ -63,7 +59,6 @@ class ExpenseModel {
         'amountInBaseCurrency': amountInBaseCurrency,
         'categoryId': categoryId,
         'note': note,
-        'receiptImageUrl': receiptImageUrl,
         'receiptBase64': receiptBase64,
         'date': date.toIso8601String(),
         'isRecurring': isRecurring,
@@ -79,9 +74,8 @@ class ExpenseModel {
     double? amountInBaseCurrency,
     String? categoryId,
     String? note,
-    String? receiptImageUrl,
     String? receiptBase64,
-    // Set true to explicitly wipe both receipt fields (remove receipt).
+    // Set true to explicitly clear the receipt (setting to null).
     bool clearReceipt = false,
     DateTime? date,
     bool? isRecurring,
@@ -97,8 +91,6 @@ class ExpenseModel {
         amountInBaseCurrency: amountInBaseCurrency ?? this.amountInBaseCurrency,
         categoryId: categoryId ?? this.categoryId,
         note: note ?? this.note,
-        receiptImageUrl:
-            clearReceipt ? null : (receiptImageUrl ?? this.receiptImageUrl),
         receiptBase64:
             clearReceipt ? null : (receiptBase64 ?? this.receiptBase64),
         date: date ?? this.date,

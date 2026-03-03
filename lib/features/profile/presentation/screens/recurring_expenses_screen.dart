@@ -89,7 +89,7 @@ class RecurringExpensesScreen extends ConsumerWidget {
           if (items.isEmpty)
             SliverFillRemaining(
               child: EmptyState(
-                emoji: '🔁',
+                icon: Icons.repeat_rounded,
                 title: 'No recurring expenses',
                 subtitle: 'Set one up to automate your tracking.',
                 actionLabel: 'Add Recurring',
@@ -212,9 +212,10 @@ class _RecurringCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
-                child: Text(
-                  cat?.emoji ?? '📦',
-                  style: const TextStyle(fontSize: 22),
+                child: Icon(
+                  cat?.icon ?? Icons.category_rounded,
+                  size: 22,
+                  color: primary,
                 ),
               ),
             ),

@@ -125,7 +125,7 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
   void _openCategoryDetail(BuildContext context, _CatSummary cat) {
     showAppBottomSheet(
       context: context,
-      title: '${cat.emoji}  ${cat.name}',
+      title: cat.name,
       child: _CategoryExpensesSheet(
         categoryId: cat.categoryId,
         dateRangeKey: _activeKey,
@@ -315,7 +315,7 @@ class _SummaryBody extends StatelessWidget {
       return _CatSummary(
         categoryId: entry.key,
         name: cat?.name ?? 'Other',
-        emoji: cat?.emoji ?? '📦',
+        icon: cat?.icon ?? Icons.category_rounded,
         color: cat?.color ?? AppColors.catOther,
         amount: entry.value,
         pct: total > 0 ? (entry.value / total * 100) : 0,
@@ -590,7 +590,7 @@ class _CategoryList extends StatelessWidget {
                         horizontal: 16, vertical: 14),
                     child: Row(
                       children: [
-                        // Emoji icon box
+                        // Icon box
                         Container(
                           width: 38,
                           height: 38,
@@ -599,8 +599,7 @@ class _CategoryList extends StatelessWidget {
                             borderRadius: BorderRadius.circular(9),
                           ),
                           child: Center(
-                            child: Text(cat.emoji,
-                                style: const TextStyle(fontSize: 18)),
+                            child: Icon(cat.icon, size: 18, color: cat.color),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -879,7 +878,11 @@ class _EmptyBody extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 48),
       child: Column(
         children: [
-          const Text('📊', style: TextStyle(fontSize: 56)),
+          Icon(
+            Icons.bar_chart_rounded,
+            size: 56,
+            color: isDark ? AppColors.darkMuted : AppColors.muted,
+          ),
           const SizedBox(height: 12),
           Text(
             'No expenses for this period',
@@ -940,7 +943,7 @@ class _CatSummary {
   const _CatSummary({
     required this.categoryId,
     required this.name,
-    required this.emoji,
+    required this.icon,
     required this.color,
     required this.amount,
     required this.pct,
@@ -948,7 +951,7 @@ class _CatSummary {
 
   final String categoryId;
   final String name;
-  final String emoji;
+  final IconData icon;
   final Color color;
   final double amount;
   final double pct;
