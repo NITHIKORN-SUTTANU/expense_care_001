@@ -74,6 +74,10 @@ class ExpenseModel {
     String? categoryId,
     String? note,
     String? receiptImageUrl,
+    // Set to true to explicitly clear the receipt URL (setting to null).
+    // Needed because `receiptImageUrl: null` alone is indistinguishable from
+    // "not provided" when using the ?? coalescing pattern.
+    bool clearReceiptUrl = false,
     DateTime? date,
     bool? isRecurring,
     String? recurringId,
@@ -88,7 +92,8 @@ class ExpenseModel {
         amountInBaseCurrency: amountInBaseCurrency ?? this.amountInBaseCurrency,
         categoryId: categoryId ?? this.categoryId,
         note: note ?? this.note,
-        receiptImageUrl: receiptImageUrl ?? this.receiptImageUrl,
+        receiptImageUrl:
+            clearReceiptUrl ? null : (receiptImageUrl ?? this.receiptImageUrl),
         date: date ?? this.date,
         isRecurring: isRecurring ?? this.isRecurring,
         recurringId: recurringId ?? this.recurringId,

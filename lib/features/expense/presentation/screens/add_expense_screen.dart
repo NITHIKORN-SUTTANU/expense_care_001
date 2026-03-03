@@ -1,11 +1,16 @@
+import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/services/receipt_service.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -36,6 +41,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   String? _selectedCategoryId;
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
+  File? _pickedReceipt;
+  bool _receiptRemoved = false;
 
   bool get _isEditing => widget.expense != null;
   bool get _isSavingsEdit =>
@@ -75,6 +82,40 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     setState(() => _selectedDate = picked);
   }
 
+  Future<void> _pickReceipt(ImageSource source) async {
+    try {
+      final file = await ReceiptService.instance.pick(source);
+      if (file == null || !mounted) return;
+      setState(() {
+        _pickedReceipt = file;
+        _receiptRemoved = false;
+      });
+    } catch (_) {
+      if (mounted) showErrorSnackBar(context, 'Could not access photos.');
+    }
+  }
+
+  Widget _buildReceiptSection(bool isDark, Color muted, Color divColor) {
+    final existingUrl =
+        _receiptRemoved ? null : widget.expense?.receiptImageUrl;
+    final hasReceipt = _pickedReceipt != null || existingUrl != null;
+    if (hasReceipt) {
+      return _ReceiptThumbnail(
+        file: _pickedReceipt,
+        url: existingUrl,
+        onRemove: () => setState(() {
+          _pickedReceipt = null;
+          _receiptRemoved = true;
+        }),
+      );
+    }
+    return _ReceiptPicker(
+      divColor: divColor,
+      muted: muted,
+      onPick: _pickReceipt,
+    );
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategoryId == null) {
@@ -90,9 +131,25 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '')) ?? 0;
     final note = _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim();
     final repo = ref.read(expenseRepositoryProvider);
+    // Determine ID upfront — needed for the Storage upload path.
+    final expenseId = _isEditing
+        ? widget.expense!.id
+        : DateTime.now().millisecondsSinceEpoch.toString();
 
     setState(() => _isLoading = true);
     try {
+      // ── Receipt handling ────────────────────────────────────────────────────
+      String? receiptUrl;
+      if (_pickedReceipt != null) {
+        receiptUrl = await ReceiptService.instance
+            .upload(uid, expenseId, _pickedReceipt!);
+      } else if (_receiptRemoved) {
+        await ReceiptService.instance.delete(uid, expenseId);
+        // receiptUrl stays null
+      } else {
+        receiptUrl = _isEditing ? widget.expense!.receiptImageUrl : null;
+      }
+
       if (_isEditing) {
         final old = widget.expense!;
         final updated = old.copyWith(
@@ -101,6 +158,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           amountInBaseCurrency: amount,
           categoryId: _selectedCategoryId!,
           note: note,
+          receiptImageUrl: receiptUrl,
+          clearReceiptUrl: _receiptRemoved,
           date: _selectedDate,
         );
         await repo.update(updated);
@@ -140,13 +199,14 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         }
       } else {
         final expense = ExpenseModel(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          id: expenseId,
           userId: uid,
           amount: amount,
           currency: currency,
           amountInBaseCurrency: amount,
           categoryId: _selectedCategoryId!,
           note: note,
+          receiptImageUrl: receiptUrl,
           date: _selectedDate,
           syncedToFirestore: true,
           createdAt: DateTime.now(),
@@ -460,6 +520,14 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               validator: Validators.note,
             ),
 
+            const SizedBox(height: AppSpacing.md),
+
+            // ── Receipt ───────────────────────────────────────────────────
+            Text('Receipt (optional)',
+                style: AppTextStyles.labelLarge(color: onBg)),
+            const SizedBox(height: AppSpacing.xxs),
+            _buildReceiptSection(isDark, muted, divColor),
+
             const SizedBox(height: AppSpacing.lg),
 
             // ── Submit ────────────────────────────────────────────────────
@@ -483,6 +551,190 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               onPressed: _canSubmit && !_isLoading ? _submit : null,
               isLoading: _isLoading,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Receipt thumbnail (shows picked file or existing network image) ───────────
+
+class _ReceiptThumbnail extends StatelessWidget {
+  const _ReceiptThumbnail({
+    required this.file,
+    required this.url,
+    required this.onRemove,
+  });
+
+  final File? file;
+  final String? url;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageWidget = file != null
+        ? Image.file(file!, fit: BoxFit.cover, width: double.infinity)
+        : CachedNetworkImage(
+            imageUrl: url!,
+            fit: BoxFit.cover,
+            width: double.infinity,
+          );
+
+    return GestureDetector(
+      onTap: () => _openViewer(context),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(height: 140, child: imageWidget),
+          ),
+          // Remove button
+          Positioned(
+            top: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 16, color: Colors.white),
+              ),
+            ),
+          ),
+          // Tap-to-view hint
+          Positioned(
+            bottom: 8,
+            left: 8,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Tap to view',
+                style: TextStyle(color: Colors.white, fontSize: 11),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openViewer(BuildContext context) {
+    final imageProvider = file != null
+        ? FileImage(file!) as ImageProvider
+        : CachedNetworkImageProvider(url!);
+
+    showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: Center(child: Image(image: imageProvider)),
+            ),
+            Positioned(
+              top: 40,
+              right: 16,
+              child: Material(
+                color: Colors.transparent,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Receipt picker (empty state — tap to choose camera or gallery) ────────────
+
+class _ReceiptPicker extends StatelessWidget {
+  const _ReceiptPicker({
+    required this.divColor,
+    required this.muted,
+    required this.onPick,
+  });
+
+  final Color divColor;
+  final Color muted;
+  final Future<void> Function(ImageSource) onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _showSourceSheet(context),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 72,
+        decoration: BoxDecoration(
+          border: Border.all(color: divColor),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_a_photo_outlined, color: muted, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Add receipt',
+              style: TextStyle(
+                color: muted,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSourceSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Camera'),
+              onTap: () {
+                Navigator.pop(context);
+                onPick(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Photo Library'),
+              onTap: () {
+                Navigator.pop(context);
+                onPick(ImageSource.gallery);
+              },
+            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
