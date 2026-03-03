@@ -90,8 +90,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         _pickedReceipt = file;
         _receiptRemoved = false;
       });
-    } catch (_) {
-      if (mounted) showErrorSnackBar(context, 'Could not access photos.');
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, 'Could not access photos: $e');
     }
   }
 
@@ -710,10 +710,13 @@ class _ReceiptPicker extends StatelessWidget {
   void _showSourceSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
+      // Must match the outer sheet (showAppBottomSheet uses useRootNavigator:true)
+      // so this sheet layers above it correctly.
+      useRootNavigator: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => SafeArea(
+      builder: (sheetCtx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -722,7 +725,7 @@ class _ReceiptPicker extends StatelessWidget {
               leading: const Icon(Icons.camera_alt_outlined),
               title: const Text('Camera'),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetCtx);
                 onPick(ImageSource.camera);
               },
             ),
@@ -730,7 +733,7 @@ class _ReceiptPicker extends StatelessWidget {
               leading: const Icon(Icons.photo_library_outlined),
               title: const Text('Photo Library'),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetCtx);
                 onPick(ImageSource.gallery);
               },
             ),
