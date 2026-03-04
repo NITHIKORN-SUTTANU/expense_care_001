@@ -35,11 +35,42 @@ final goalsProvider = StreamProvider<List<GoalModel>>((ref) {
           (s) => s.docs.map((d) => GoalModel.fromMap(d.data(), d.id)).toList());
 });
 
+/// All icons available for goal selection.
+/// Declared at top level so [_goalIconLookup] can reference them and Flutter's
+/// web icon tree-shaker sees every glyph as a compile-time constant.
+const _kGoalIcons = [
+  Icons.flag_rounded,
+  Icons.home_rounded,
+  Icons.flight_rounded,
+  Icons.laptop_rounded,
+  Icons.directions_car_rounded,
+  Icons.smartphone_rounded,
+  Icons.school_rounded,
+  Icons.diamond_rounded,
+  Icons.security_rounded,
+  Icons.sports_esports_rounded,
+  Icons.photo_camera_rounded,
+  Icons.park_rounded,
+  Icons.directions_walk_rounded,
+  Icons.music_note_rounded,
+  Icons.fitness_center_rounded,
+  Icons.pets_rounded,
+  Icons.shopping_cart_rounded,
+  Icons.favorite_rounded,
+];
+
+/// Maps stored codePoint integers back to their constant [IconData].
+/// Built once at startup; avoids non-constant IconData construction which
+/// would break Flutter web's icon tree-shaking.
+final _goalIconLookup = <int, IconData>{
+  for (final icon in _kGoalIcons) icon.codePoint: icon,
+};
+
 /// Converts a stored goal icon string (codePoint) back to an [IconData].
-/// Falls back to [Icons.flag_rounded] for legacy emoji data or invalid values.
+/// Falls back to [Icons.flag_rounded] for unrecognised or legacy values.
 IconData _goalIconData(String stored) {
   final cp = int.tryParse(stored);
-  if (cp != null) return IconData(cp, fontFamily: 'MaterialIcons');
+  if (cp != null) return _goalIconLookup[cp] ?? Icons.flag_rounded;
   return Icons.flag_rounded;
 }
 
@@ -328,26 +359,7 @@ class _GoalFormSheetState extends ConsumerState<_GoalFormSheet> {
 
   bool get _isEditing => widget.goal != null;
 
-  static const _goalIcons = [
-    Icons.flag_rounded,
-    Icons.home_rounded,
-    Icons.flight_rounded,
-    Icons.laptop_rounded,
-    Icons.directions_car_rounded,
-    Icons.smartphone_rounded,
-    Icons.school_rounded,
-    Icons.diamond_rounded,
-    Icons.security_rounded,
-    Icons.sports_esports_rounded,
-    Icons.photo_camera_rounded,
-    Icons.park_rounded,
-    Icons.directions_walk_rounded,
-    Icons.music_note_rounded,
-    Icons.fitness_center_rounded,
-    Icons.pets_rounded,
-    Icons.shopping_cart_rounded,
-    Icons.favorite_rounded,
-  ];
+  static const _goalIcons = _kGoalIcons;
 
   @override
   void initState() {
