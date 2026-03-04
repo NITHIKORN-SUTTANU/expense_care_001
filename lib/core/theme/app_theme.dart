@@ -168,6 +168,9 @@ class AppTheme {
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button)),
       ),
+      navigationRailTheme: const NavigationRailThemeData(
+        useIndicator: false,
+      ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
           (states) =>
