@@ -2,49 +2,57 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/providers/user_preferences_provider.dart';
+import '../../../../shared/widgets/app_bottom_sheet.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/widgets/app_date_picker.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../../shared/widgets/error_snackbar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../expense/domain/models/category_model.dart';
 import '../../../expense/presentation/widgets/category_selector.dart';
-import '../../../../shared/widgets/app_date_picker.dart';
+import '../../../recurring/data/recurring_repository.dart';
 import '../../../recurring/domain/models/recurring_expense_model.dart';
-
-// ── Firestore provider ────────────────────────────────────────────────────────
-
-final recurringProvider =
-    StreamProvider<List<RecurringExpenseModel>>((ref) {
-  final uid = ref.watch(authStateProvider).valueOrNull?.uid;
-  if (uid == null) return Stream.value([]);
-  return FirebaseFirestore.instance
-      .collection('users')
-      .doc(uid)
-      .collection('recurring')
-      .orderBy('createdAt', descending: true)
-      .snapshots()
-      .map((s) =>
-          s.docs.map((d) => RecurringExpenseModel.fromMap(d.data(), d.id)).toList());
-});
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class RecurringExpensesScreen extends ConsumerWidget {
   const RecurringExpensesScreen({super.key});
 
-  void _openAddSheet(BuildContext context) {
-    showModalBottomSheet(
+  void _openSheet(BuildContext context, {RecurringExpenseModel? item}) {
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _AddRecurringSheet(),
+      title: item == null ? 'New Recurring Expense' : 'Edit Recurring Expense',
+      child: _RecurringFormSheet(item: item),
     );
+  }
+
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    RecurringExpenseModel item,
+  ) async {
+    final uid = ref.read(authStateProvider).valueOrNull?.uid;
+    if (uid == null) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('recurring')
+          .doc(item.id)
+          .delete();
+    } catch (_) {
+      if (context.mounted) {
+        showErrorSnackBar(context, 'Failed to delete. Please try again.');
+      }
+    }
   }
 
   @override
@@ -72,7 +80,7 @@ class RecurringExpensesScreen extends ConsumerWidget {
             actions: [
               IconButton(
                 icon: const Icon(Icons.add_rounded),
-                onPressed: () => _openAddSheet(context),
+                onPressed: () => _openSheet(context),
                 tooltip: 'Add Recurring',
               ),
               const SizedBox(width: 4),
@@ -93,7 +101,7 @@ class RecurringExpensesScreen extends ConsumerWidget {
                 title: 'No recurring expenses',
                 subtitle: 'Set one up to automate your tracking.',
                 actionLabel: 'Add Recurring',
-                onAction: () => _openAddSheet(context),
+                onAction: () => _openSheet(context),
               ),
             )
           else
@@ -107,7 +115,8 @@ class RecurringExpensesScreen extends ConsumerWidget {
                     child: _RecurringCard(
                       item: items[i],
                       isDark: isDark,
-                      onDelete: () => _delete(ref, items[i]),
+                      onEdit: () => _openSheet(context, item: items[i]),
+                      onDelete: () => _delete(context, ref, items[i]),
                     ),
                   ),
                   childCount: items.length,
@@ -118,17 +127,6 @@ class RecurringExpensesScreen extends ConsumerWidget {
       ),
     );
   }
-
-  Future<void> _delete(WidgetRef ref, RecurringExpenseModel item) async {
-    final uid = ref.read(authStateProvider).valueOrNull?.uid;
-    if (uid == null) return;
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('recurring')
-        .doc(item.id)
-        .delete();
-  }
 }
 
 // ── Recurring card ────────────────────────────────────────────────────────────
@@ -137,11 +135,13 @@ class _RecurringCard extends StatelessWidget {
   const _RecurringCard({
     required this.item,
     required this.isDark,
+    required this.onEdit,
     required this.onDelete,
   });
 
   final RecurringExpenseModel item;
   final bool isDark;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
@@ -150,6 +150,7 @@ class _RecurringCard extends StatelessWidget {
     final borderColor = isDark ? AppColors.darkDivider : AppColors.divider;
     final surfaceColor = isDark ? AppColors.darkSurface : AppColors.surface;
     final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
+    final muted = isDark ? AppColors.darkMuted : AppColors.muted;
     final isOverdue = !item.nextDueDate.isAfter(DateTime.now());
 
     return Dismissible(
@@ -194,84 +195,134 @@ class _RecurringCard extends StatelessWidget {
         );
       },
       onDismissed: (_) => onDelete(),
-      child: Container(
-        decoration: BoxDecoration(
-          color: surfaceColor,
+      child: Material(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: InkWell(
+          onTap: onEdit,
           borderRadius: BorderRadius.circular(AppRadius.card),
-          border: Border.all(color: borderColor),
-        ),
-        padding: const EdgeInsets.all(AppSpacing.sm),
-        child: Row(
-          children: [
-            // Emoji avatar
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Icon(
-                  cat?.icon ?? Icons.category_rounded,
-                  size: 22,
-                  color: primary,
-                ),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(
+                color: item.isActive ? borderColor : borderColor.withValues(alpha: 0.5),
               ),
             ),
-
-            const SizedBox(width: AppSpacing.sm),
-
-            // Name + next due
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    style: AppTextStyles.labelLarge(
-                      color: isDark
-                          ? AppColors.darkOnBackground
-                          : AppColors.onBackground,
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Category icon avatar
+                Opacity(
+                  opacity: item.isActive ? 1.0 : 0.4,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      _FrequencyBadge(
-                        label: item.frequencyLabel,
-                        isDark: isDark,
+                    child: Center(
+                      child: Icon(
+                        cat?.icon ?? Icons.category_rounded,
+                        size: 22,
+                        color: primary,
                       ),
-                      const SizedBox(width: 6),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: AppSpacing.sm),
+
+                // Name + frequency badge (middle, expands)
+                Expanded(
+                  child: Opacity(
+                    opacity: item.isActive ? 1.0 : 0.5,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Name + paused badge
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                item.name,
+                                style: AppTextStyles.labelLarge(
+                                  color: isDark
+                                      ? AppColors.darkOnBackground
+                                      : AppColors.onBackground,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (!item.isActive) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: muted.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                                child: Text(
+                                  'Paused',
+                                  style: AppTextStyles.labelSmall(color: muted)
+                                      .copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        // Frequency badge only
+                        _FrequencyBadge(
+                          label: item.frequencyLabel,
+                          isDark: isDark,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: AppSpacing.sm),
+
+                // Right column: amount (top) + due date (bottom)
+                Opacity(
+                  opacity: item.isActive ? 1.0 : 0.5,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Amount
                       Text(
-                        'Due ${DateFormat('MMM d').format(item.nextDueDate)}',
+                        NumberFormat.simpleCurrency(name: item.currency)
+                            .format(item.amount),
+                        style: AppTextStyles.labelLarge(
+                          color: isDark
+                              ? AppColors.darkPrimary
+                              : AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Due date
+                      Text(
+                        item.isActive
+                            ? 'Due ${DateFormat('d MMM yyyy').format(item.nextDueDate)}'
+                            : '—',
                         style: AppTextStyles.labelSmall(
-                          color: isOverdue
+                          color: isOverdue && item.isActive
                               ? (isDark
                                   ? AppColors.darkError
                                   : AppColors.error)
-                              : (isDark
-                                  ? AppColors.darkMuted
-                                  : AppColors.muted),
+                              : muted,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-
-            // Amount
-            Text(
-              NumberFormat.simpleCurrency(name: item.currency)
-                  .format(item.amount),
-              style: AppTextStyles.labelLarge(
-                color: isDark ? AppColors.darkPrimary : AppColors.primary,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -301,25 +352,30 @@ class _FrequencyBadge extends StatelessWidget {
   }
 }
 
-// ── Add Recurring bottom sheet ────────────────────────────────────────────────
+// ── Recurring form sheet (Add & Edit) ─────────────────────────────────────────
 
-class _AddRecurringSheet extends ConsumerStatefulWidget {
-  const _AddRecurringSheet();
+class _RecurringFormSheet extends ConsumerStatefulWidget {
+  const _RecurringFormSheet({this.item});
+  final RecurringExpenseModel? item;
 
   @override
-  ConsumerState<_AddRecurringSheet> createState() => _AddRecurringSheetState();
+  ConsumerState<_RecurringFormSheet> createState() =>
+      _RecurringFormSheetState();
 }
 
-class _AddRecurringSheetState extends ConsumerState<_AddRecurringSheet> {
+class _RecurringFormSheetState extends ConsumerState<_RecurringFormSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _nameCtrl = TextEditingController();
-  final _amountCtrl = TextEditingController();
-  final _noteCtrl = TextEditingController();
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _amountCtrl;
+  late final TextEditingController _noteCtrl;
 
-  String? _selectedCategoryId;
-  String _frequency = 'monthly';
-  DateTime _startDate = DateTime.now();
+  late String? _selectedCategoryId;
+  late String _frequency;
+  late DateTime _startDate;
+  late bool _isActive;
   bool _isSaving = false;
+
+  bool get _isEditing => widget.item != null;
 
   static const _frequencies = [
     ('daily', 'Daily'),
@@ -327,6 +383,24 @@ class _AddRecurringSheetState extends ConsumerState<_AddRecurringSheet> {
     ('monthly', 'Monthly'),
     ('yearly', 'Yearly'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final g = widget.item;
+    _nameCtrl = TextEditingController(text: g?.name ?? '');
+    _amountCtrl = TextEditingController(
+      text: g != null
+          ? g.amount.toStringAsFixed(
+              g.amount == g.amount.truncate() ? 0 : 2)
+          : '',
+    );
+    _noteCtrl = TextEditingController(text: g?.note ?? '');
+    _selectedCategoryId = g?.categoryId;
+    _frequency = g?.frequency ?? 'monthly';
+    _startDate = g?.startDate ?? DateTime.now();
+    _isActive = g?.isActive ?? true;
+  }
 
   @override
   void dispose() {
@@ -348,53 +422,161 @@ class _AddRecurringSheetState extends ConsumerState<_AddRecurringSheet> {
     }
   }
 
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Recurring Expense'),
+        content: Text('Remove "${widget.item!.name}" from recurring expenses?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'Delete',
+              style: TextStyle(
+                color: Theme.of(ctx).brightness == Brightness.dark
+                    ? AppColors.darkError
+                    : AppColors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final uid = ref.read(authStateProvider).valueOrNull?.uid;
+    if (uid == null) return;
+
+    setState(() => _isSaving = true);
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('recurring')
+          .doc(widget.item!.id)
+          .delete();
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) showErrorSnackBar(context, 'Failed to delete. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category.')),
-      );
+      showErrorSnackBar(context, 'Please select a category.');
       return;
     }
 
     final uid = ref.read(authStateProvider).valueOrNull?.uid;
     if (uid == null) return;
 
+    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', ''));
+    if (amount == null || amount <= 0) return;
+
     final currency =
         ref.read(userPreferencesNotifierProvider)?.preferredCurrency ?? 'USD';
+    final note = _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim();
 
     setState(() => _isSaving = true);
     try {
       final now = DateTime.now();
-      final amount =
-          double.parse(_amountCtrl.text.replaceAll(',', ''));
+      // Normalize to midnight so expense IDs (based on due.millisecondsSinceEpoch)
+      // are always the same for a given calendar date — prevents duplicates on resume.
+      final today = DateTime(now.year, now.month, now.day);
 
-      final recurring = RecurringExpenseModel(
-        id: now.millisecondsSinceEpoch.toString(),
-        userId: uid,
-        name: _nameCtrl.text.trim(),
-        amount: amount,
-        currency: currency,
-        categoryId: _selectedCategoryId!,
-        frequency: _frequency,
-        startDate: _startDate,
-        nextDueDate: _startDate,
-        note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
-        createdAt: now,
-      );
+      if (_isEditing) {
+        // Only update mutable fields — createdAt stays unchanged.
+        // On resume: reset nextDueDate to midnight today. The check provider
+        // uses SetOptions(merge: false) with a deterministic date-based ID, so
+        // the existing expense doc is overwritten rather than duplicated.
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('recurring')
+            .doc(widget.item!.id)
+            .update({
+          'name': _nameCtrl.text.trim(),
+          'amount': amount,
+          'categoryId': _selectedCategoryId,
+          'frequency': _frequency,
+          'startDate': _startDate.toIso8601String(),
+          'note': note,
+          'isActive': _isActive,
+          if (!widget.item!.isActive && _isActive)
+            'nextDueDate': today.toIso8601String(),
+        });
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('recurring')
-          .doc(recurring.id)
-          .set(recurring.toMap());
+        // Propagate changed fields to every expense document that was
+        // generated from this recurring item (identified by recurringId).
+        // Dates are intentionally left unchanged — past records stay accurate.
+        final expSnap = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('expenses')
+            .where('recurringId', isEqualTo: widget.item!.id)
+            .get();
+
+        if (expSnap.docs.isNotEmpty) {
+          final expNote = note ?? _nameCtrl.text.trim();
+          // Commit in chunks of 490 to stay under Firestore's 500-op limit.
+          const kChunk = 490;
+          final docs = expSnap.docs;
+          for (var i = 0; i < docs.length; i += kChunk) {
+            final chunk = docs.sublist(
+                i, (i + kChunk).clamp(0, docs.length));
+            final expBatch = FirebaseFirestore.instance.batch();
+            for (final doc in chunk) {
+              expBatch.update(doc.reference, {
+                'amount': amount,
+                'amountInBaseCurrency': amount,
+                'categoryId': _selectedCategoryId,
+                'note': expNote,
+              });
+            }
+            await expBatch.commit();
+          }
+        }
+      } else {
+        final recurring = RecurringExpenseModel(
+          id: now.millisecondsSinceEpoch.toString(),
+          userId: uid,
+          name: _nameCtrl.text.trim(),
+          amount: amount,
+          currency: currency,
+          categoryId: _selectedCategoryId!,
+          frequency: _frequency,
+          startDate: _startDate,
+          // Normalize to midnight so expense IDs are date-deterministic.
+          // Past start date → track from today; future → use that date at midnight.
+          nextDueDate: _startDate.isAfter(now)
+              ? DateTime(_startDate.year, _startDate.month, _startDate.day)
+              : today,
+          note: note,
+          createdAt: now,
+        );
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('recurring')
+            .doc(recurring.id)
+            .set(recurring.toMap());
+      }
 
       if (mounted) Navigator.pop(context);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save. Please try again.')),
+        showErrorSnackBar(
+          context,
+          _isEditing ? 'Failed to update. Please try again.' : 'Failed to save. Please try again.',
         );
       }
     } finally {
@@ -408,205 +590,201 @@ class _AddRecurringSheetState extends ConsumerState<_AddRecurringSheet> {
     final divColor = isDark ? AppColors.darkDivider : AppColors.divider;
     final muted = isDark ? AppColors.darkMuted : AppColors.muted;
     final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
+    final onBg = isDark ? AppColors.darkOnBackground : AppColors.onBackground;
     final currency =
         ref.watch(userPreferencesNotifierProvider)?.preferredCurrency ?? 'USD';
     final currencySymbol =
         NumberFormat.simpleCurrency(name: currency).currencySymbol;
 
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.92,
-      ),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.surface,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(AppRadius.bottomSheetTop),
-        ),
-      ),
-      padding: EdgeInsets.only(
-        left: AppSpacing.md,
-        right: AppSpacing.md,
-        top: AppSpacing.xs,
-        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.xs,
+        AppSpacing.md,
+        MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
       ),
       child: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                  decoration: BoxDecoration(
-                    color: divColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Name ──────────────────────────────────────────────────
+            AppTextField(
+              controller: _nameCtrl,
+              label: 'Name',
+              hint: 'e.g. Netflix, Rent',
+              validator: Validators.recurringName,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: AppSpacing.sm),
 
-              Text(
-                'New Recurring Expense',
-                style: AppTextStyles.titleLarge(
-                  color: isDark
-                      ? AppColors.darkOnBackground
-                      : AppColors.onBackground,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
+            // ── Amount ────────────────────────────────────────────────
+            AppTextField(
+              controller: _amountCtrl,
+              label: 'Amount',
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              prefixText: '$currencySymbol ',
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+              ],
+              validator: (v) =>
+                  Validators.requiredPositiveNumber(v, label: 'Amount'),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: AppSpacing.md),
 
-              // ── Name ──────────────────────────────────────────────────
-              AppTextField(
-                controller: _nameCtrl,
-                label: 'Name',
-                hint: 'e.g. Netflix, Rent',
-                validator: Validators.recurringName,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.sm),
+            // ── Category ──────────────────────────────────────────────
+            Text('Category', style: AppTextStyles.labelLarge(color: onBg)),
+            const SizedBox(height: AppSpacing.xxs),
+            CategorySelector(
+              selectedId: _selectedCategoryId,
+              onSelected: (id) => setState(() => _selectedCategoryId = id),
+              categories: CategoryModel.defaults
+                  .where((c) => c.id != 'savings')
+                  .toList(),
+            ),
+            const SizedBox(height: AppSpacing.md),
 
-              // ── Amount ────────────────────────────────────────────────
-              AppTextField(
-                controller: _amountCtrl,
-                label: 'Amount',
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                prefixText: '$currencySymbol ',
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
-                ],
-                validator: (v) =>
-                    Validators.requiredPositiveNumber(v, label: 'Amount'),
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // ── Category ──────────────────────────────────────────────
-              Text(
-                'Category',
-                style: AppTextStyles.labelLarge(
-                  color: isDark
-                      ? AppColors.darkOnBackground
-                      : AppColors.onBackground,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              CategorySelector(
-                selectedId: _selectedCategoryId,
-                onSelected: (id) => setState(() => _selectedCategoryId = id),
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // ── Frequency ─────────────────────────────────────────────
-              Text(
-                'Frequency',
-                style: AppTextStyles.labelLarge(
-                  color: isDark
-                      ? AppColors.darkOnBackground
-                      : AppColors.onBackground,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Row(
-                children: _frequencies.map((entry) {
-                  final (value, label) = entry;
-                  final selected = _frequency == value;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _frequency = value),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        margin: const EdgeInsets.only(right: 6),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? primary.withValues(alpha: 0.12)
-                              : Colors.transparent,
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.chip + 2),
-                          border: Border.all(
-                            color: selected ? primary : divColor,
-                            width: selected ? 1.5 : 1,
-                          ),
+            // ── Frequency ─────────────────────────────────────────────
+            Text('Frequency', style: AppTextStyles.labelLarge(color: onBg)),
+            const SizedBox(height: AppSpacing.xxs),
+            Row(
+              children: _frequencies.map((entry) {
+                final (value, label) = entry;
+                final selected = _frequency == value;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _frequency = value),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? primary.withValues(alpha: 0.12)
+                            : Colors.transparent,
+                        borderRadius:
+                            BorderRadius.circular(AppRadius.chip + 2),
+                        border: Border.all(
+                          color: selected ? primary : divColor,
+                          width: selected ? 1.5 : 1,
                         ),
-                        child: Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.labelSmall(
-                            color: selected ? primary : muted,
-                          ).copyWith(fontWeight: FontWeight.w600),
-                        ),
+                      ),
+                      child: Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.labelSmall(
+                          color: selected ? primary : muted,
+                        ).copyWith(fontWeight: FontWeight.w600),
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: AppSpacing.md),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: AppSpacing.md),
 
-              // ── Start Date ────────────────────────────────────────────
-              Text(
-                'Start Date',
-                style: AppTextStyles.labelLarge(
-                  color: isDark
-                      ? AppColors.darkOnBackground
-                      : AppColors.onBackground,
+            // ── Start Date ────────────────────────────────────────────
+            Text('Start Date', style: AppTextStyles.labelLarge(color: onBg)),
+            const SizedBox(height: AppSpacing.xxs),
+            GestureDetector(
+              onTap: _pickStartDate,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: divColor),
+                  borderRadius: BorderRadius.circular(AppRadius.input),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_today_rounded, size: 18, color: muted),
+                    const SizedBox(width: 10),
+                    Text(
+                      DateFormat('EEE, MMM d, yyyy').format(_startDate),
+                      style: AppTextStyles.bodyMedium(color: onBg),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.xxs),
-              GestureDetector(
-                onTap: _pickStartDate,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: divColor),
-                    borderRadius: BorderRadius.circular(AppRadius.input),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.calendar_today_rounded,
-                          size: 18, color: muted),
-                      const SizedBox(width: 10),
-                      Text(
-                        DateFormat('EEE, MMM d, yyyy').format(_startDate),
-                        style: AppTextStyles.bodyMedium(
-                          color: isDark
-                              ? AppColors.darkOnBackground
-                              : AppColors.onBackground,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+
+            // ── Note ──────────────────────────────────────────────────
+            AppTextField(
+              controller: _noteCtrl,
+              label: 'Note (optional)',
+              hint: 'e.g. Family plan',
+              maxLength: 200,
+              textInputAction: TextInputAction.done,
+              validator: Validators.note,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+
+            // ── Pause / Resume toggle (edit only) ─────────────────────
+            if (_isEditing) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Active',
+                          style: AppTextStyles.labelLarge(color: onBg),
                         ),
-                      ),
-                    ],
+                        Text(
+                          _isActive
+                              ? 'Expenses will be tracked automatically'
+                              : 'No expenses will be recorded',
+                          style: AppTextStyles.labelSmall(color: muted),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                  Switch(
+                    value: _isActive,
+                    onChanged: (v) => setState(() => _isActive = v),
+                    activeThumbColor: primary,
+                  ),
+                ],
               ),
               const SizedBox(height: AppSpacing.sm),
-
-              // ── Note ──────────────────────────────────────────────────
-              AppTextField(
-                controller: _noteCtrl,
-                label: 'Note (optional)',
-                hint: 'e.g. Family plan',
-                maxLength: 200,
-                textInputAction: TextInputAction.done,
-                validator: Validators.note,
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // ── Save ──────────────────────────────────────────────────
-              AppButton(
-                label: 'Save',
-                onPressed: _isSaving ? null : _save,
-                isLoading: _isSaving,
-              ),
             ],
-          ),
+
+            const SizedBox(height: AppSpacing.xs),
+
+            // ── Delete (edit only) ────────────────────────────────────
+            if (_isEditing) ...[
+              OutlinedButton(
+                onPressed: _isSaving ? null : _delete,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
+                child: Text(
+                  'Delete Recurring Expense',
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+            ],
+
+            // ── Save ──────────────────────────────────────────────────
+            AppButton(
+              label: _isEditing ? 'Save Changes' : 'Save',
+              onPressed: _isSaving ? null : _save,
+              isLoading: _isSaving,
+            ),
+          ],
         ),
       ),
     );

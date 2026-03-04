@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze lib/features/summary/presentation/screens/summary_screen.dart)",
+      "Bash(flutter analyze lib/shared/widgets/app_date_picker.dart)"
+    ]
+  }
+}

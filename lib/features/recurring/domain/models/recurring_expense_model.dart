@@ -69,24 +69,4 @@ class RecurringExpenseModel {
         'createdAt': createdAt.toIso8601String(),
       };
 
-  DateTime computeNextDue() {
-    final base = nextDueDate;
-    return switch (frequency) {
-      'daily' => base.add(const Duration(days: 1)),
-      'weekly' => base.add(const Duration(days: 7)),
-      'monthly' => _addMonths(base, 1),
-      'yearly' => _addMonths(base, 12),
-      _ => base,
-    };
-  }
-
-  /// Advances [base] by [months], clamping the day to the last valid day of
-  /// the target month (e.g. Jan 31 + 1 month → Feb 28/29, not Mar 2/3).
-  static DateTime _addMonths(DateTime base, int months) {
-    final totalMonth = base.month - 1 + months;
-    final year = base.year + totalMonth ~/ 12;
-    final month = totalMonth % 12 + 1;
-    final lastDay = DateTime(year, month + 1, 0).day;
-    return DateTime(year, month, base.day.clamp(1, lastDay));
-  }
 }

@@ -1200,3 +1200,245 @@ class _ConfirmBar extends StatelessWidget {
         ],
       );
 }
+
+// ── Custom Period Picker ───────────────────────────────────────────────────────
+
+/// Result returned by [showAppCustomPeriodPicker].
+/// [isRange] false → single day ([start] only).
+/// [isRange] true  → [start]..[end] range.
+typedef CustomPeriodResult = ({
+  bool isRange,
+  DateTime start,
+  DateTime? end,
+});
+
+/// Shows a bottom sheet that lets the user pick either a single day or a date
+/// range, controlled by a toggle inside the sheet.
+Future<CustomPeriodResult?> showAppCustomPeriodPicker({
+  required BuildContext context,
+  required DateTime firstDate,
+  required DateTime lastDate,
+  bool initialIsRange = false,
+  DateTime? initialStart,
+  DateTime? initialEnd,
+}) {
+  return showModalBottomSheet<CustomPeriodResult>(
+    context: context,
+    isScrollControlled: true,
+    isDismissible: true,
+    backgroundColor: Colors.transparent,
+    useRootNavigator: true,
+    builder: (_) => _CustomPeriodSheet(
+      firstDate: firstDate,
+      lastDate: lastDate,
+      initialIsRange: initialIsRange,
+      initialStart: initialStart,
+      initialEnd: initialEnd,
+    ),
+  );
+}
+
+class _CustomPeriodSheet extends StatefulWidget {
+  const _CustomPeriodSheet({
+    required this.firstDate,
+    required this.lastDate,
+    required this.initialIsRange,
+    this.initialStart,
+    this.initialEnd,
+  });
+
+  final DateTime firstDate;
+  final DateTime lastDate;
+  final bool initialIsRange;
+  final DateTime? initialStart;
+  final DateTime? initialEnd;
+
+  @override
+  State<_CustomPeriodSheet> createState() => _CustomPeriodSheetState();
+}
+
+class _CustomPeriodSheetState extends State<_CustomPeriodSheet> {
+  late bool _isRange;
+  DateTime? _start;
+  DateTime? _end;
+  late DateTime _display;
+
+  @override
+  void initState() {
+    super.initState();
+    _isRange = widget.initialIsRange;
+    _start = widget.initialStart;
+    _end = widget.initialEnd;
+    final anchor = _start ?? DateTime.now();
+    _display = DateTime(anchor.year, anchor.month);
+  }
+
+  bool get _canPrev =>
+      _display.isAfter(DateTime(widget.firstDate.year, widget.firstDate.month));
+
+  bool get _canNext =>
+      _display.isBefore(DateTime(widget.lastDate.year, widget.lastDate.month));
+
+  void _onToggleRange(bool value) {
+    setState(() {
+      _isRange = value;
+      _start = null; // clear both when toggling so user picks fresh
+      _end = null;
+    });
+  }
+
+  void _onDaySingleTap(DateTime day) => setState(() => _start = day);
+
+  void _onDayRangeTap(DateTime day) {
+    setState(() {
+      if (_start == null || _end != null) {
+        // No start yet, or both set → start a fresh selection
+        _start = day;
+        _end = null;
+      } else if (_sameDay(day, _start!)) {
+        _end = day;
+      } else if (_beforeDay(day, _start!)) {
+        _end = _start;
+        _start = day;
+      } else {
+        _end = day;
+      }
+    });
+  }
+
+  VoidCallback? get _confirmCallback {
+    if (_start == null) return null;
+    if (!_isRange) {
+      return () => Navigator.of(context)
+          .pop((isRange: false, start: _start!, end: null));
+    }
+    if (_end != null) {
+      return () => Navigator.of(context)
+          .pop((isRange: true, start: _start!, end: _end));
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkSurface : AppColors.surface;
+    final borderColor = isDark ? AppColors.darkDivider : AppColors.divider;
+    final onBg = isDark ? AppColors.darkOnBackground : AppColors.onBackground;
+    final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
+    final muted = isDark ? AppColors.darkMuted : AppColors.muted;
+
+    return Container(
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadius.bottomSheetTop)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _DragHandle(color: borderColor),
+            _SheetTitle(title: 'Custom Period', onBg: onBg),
+
+            // ── Range toggle ──────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 8, 12),
+              child: Row(
+                children: [
+                  Text('Date Range',
+                      style: AppTextStyles.labelLarge(color: onBg)),
+                  const Spacer(),
+                  Switch(
+                    value: _isRange,
+                    onChanged: _onToggleRange,
+                    activeThumbColor: primary,
+                  ),
+                ],
+              ),
+            ),
+
+            // ── FROM / TO chips (range mode only) ────────────────────
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              child: _isRange
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _DateChip(
+                              label: 'FROM',
+                              date: _start,
+                              active: _start == null,
+                              primary: primary,
+                              onBg: onBg,
+                              muted: muted,
+                              isDark: isDark,
+                            ),
+                          ),
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 10),
+                            child: Icon(Icons.arrow_forward_rounded,
+                                size: 14, color: muted),
+                          ),
+                          Expanded(
+                            child: _DateChip(
+                              label: 'TO',
+                              date: _end,
+                              active: _start != null && _end == null,
+                              primary: primary,
+                              onBg: onBg,
+                              muted: muted,
+                              isDark: isDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+
+            Divider(height: 1, color: borderColor),
+
+            // ── Calendar ──────────────────────────────────────────────
+            Flexible(
+              child: SingleChildScrollView(
+                child: _CalendarGrid(
+                  display: _display,
+                  // In range mode before an end is picked, show start as a
+                  // plain selected circle. Switch to rangeStart/End only once
+                  // both ends are known so the band renders correctly.
+                  selectedDate: !_isRange || _end == null ? _start : null,
+                  rangeStart: _isRange && _start != null && _end != null ? _start : null,
+                  rangeEnd: _isRange && _start != null ? _end : null,
+                  firstDate: widget.firstDate,
+                  lastDate: widget.lastDate,
+                  canPrev: _canPrev,
+                  canNext: _canNext,
+                  onPrev: () => setState(() =>
+                      _display = DateTime(_display.year, _display.month - 1)),
+                  onNext: () => setState(() =>
+                      _display = DateTime(_display.year, _display.month + 1)),
+                  onDisplayChanged: (d) => setState(() => _display = d),
+                  onDayTap: _isRange ? _onDayRangeTap : _onDaySingleTap,
+                  isDark: isDark,
+                ),
+              ),
+            ),
+
+            _ConfirmBar(
+              borderColor: borderColor,
+              onConfirm: _confirmCallback,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -31,7 +31,8 @@ final goalsProvider = StreamProvider<List<GoalModel>>((ref) {
       .collection('goals')
       .orderBy('createdAt', descending: true)
       .snapshots()
-      .map((s) => s.docs.map((d) => GoalModel.fromMap(d.data(), d.id)).toList());
+      .map(
+          (s) => s.docs.map((d) => GoalModel.fromMap(d.data(), d.id)).toList());
 });
 
 /// Converts a stored goal icon string (codePoint) back to an [IconData].
@@ -84,8 +85,7 @@ class GoalsScreen extends ConsumerWidget {
           SliverAppBar(
             pinned: true,
             expandedHeight: 0,
-            backgroundColor:
-                isDark ? AppColors.darkSurface : AppColors.surface,
+            backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
             titleSpacing: 20,
             title: Text(
               'Goals',
@@ -111,7 +111,6 @@ class GoalsScreen extends ConsumerWidget {
               ),
             ),
           ),
-
           if (goals.isEmpty)
             SliverFillRemaining(
               child: EmptyState(
@@ -208,8 +207,7 @@ class _GoalCard extends StatelessWidget {
                       value: goal.progress,
                       strokeWidth: 4.5,
                       backgroundColor: borderColor,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(progressColor),
+                      valueColor: AlwaysStoppedAnimation<Color>(progressColor),
                     ),
                     Icon(
                       _goalIconData(goal.emoji),
@@ -287,8 +285,7 @@ class _GoalCard extends StatelessWidget {
                             horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
                           color: secondary.withValues(alpha: 0.14),
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.chip),
+                          borderRadius: BorderRadius.circular(AppRadius.chip),
                         ),
                         child: Text(
                           'Add',
@@ -434,11 +431,8 @@ class _GoalFormSheetState extends ConsumerState<_GoalFormSheet> {
             .collection('expenses')
             .where('goalId', isEqualTo: widget.goal!.id)
             .get();
-        final batch = FirebaseFirestore.instance.batch();
-        for (final doc in snap.docs) {
-          batch.delete(doc.reference);
-        }
-        await batch.commit();
+        final repo = ref.read(expenseRepositoryProvider);
+        await Future.wait(snap.docs.map((doc) => repo.delete(uid, doc.id)));
       }
       await FirebaseFirestore.instance
           .collection('users')
@@ -461,8 +455,8 @@ class _GoalFormSheetState extends ConsumerState<_GoalFormSheet> {
 
     final currency =
         ref.read(userPreferencesNotifierProvider)?.preferredCurrency ?? 'USD';
-    final targetAmount =
-        double.parse(_targetCtrl.text.replaceAll(',', ''));
+    final targetAmount = double.tryParse(_targetCtrl.text.replaceAll(',', ''));
+    if (targetAmount == null || targetAmount <= 0) return;
 
     setState(() => _isSaving = true);
     try {
@@ -523,8 +517,8 @@ class _GoalFormSheetState extends ConsumerState<_GoalFormSheet> {
       if (mounted) Navigator.pop(context);
     } catch (_) {
       if (mounted) {
-        showErrorSnackBar(
-            context, _isEditing ? 'Failed to update goal.' : 'Failed to save goal.');
+        showErrorSnackBar(context,
+            _isEditing ? 'Failed to update goal.' : 'Failed to save goal.');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -564,8 +558,8 @@ class _GoalFormSheetState extends ConsumerState<_GoalFormSheet> {
               children: _goalIcons.map((iconData) {
                 final selected = iconData.codePoint.toString() == _emoji;
                 return GestureDetector(
-                  onTap: () => setState(
-                      () => _emoji = iconData.codePoint.toString()),
+                  onTap: () =>
+                      setState(() => _emoji = iconData.codePoint.toString()),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     width: 46,
@@ -614,8 +608,8 @@ class _GoalFormSheetState extends ConsumerState<_GoalFormSheet> {
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))
               ],
-              validator: (v) => Validators.requiredPositiveNumber(
-                  v, label: 'Target amount'),
+              validator: (v) =>
+                  Validators.requiredPositiveNumber(v, label: 'Target amount'),
               textInputAction: TextInputAction.done,
             ),
 
@@ -639,16 +633,15 @@ class _GoalFormSheetState extends ConsumerState<_GoalFormSheet> {
                 }
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
                   border: Border.all(color: divColor),
                   borderRadius: BorderRadius.circular(AppRadius.input),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.calendar_today_rounded,
-                        size: 18, color: muted),
+                    Icon(Icons.calendar_today_rounded, size: 18, color: muted),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -663,8 +656,8 @@ class _GoalFormSheetState extends ConsumerState<_GoalFormSheet> {
                     if (_targetDate != null)
                       GestureDetector(
                         onTap: () => setState(() => _targetDate = null),
-                        child: Icon(Icons.close_rounded,
-                            size: 16, color: muted),
+                        child:
+                            Icon(Icons.close_rounded, size: 16, color: muted),
                       ),
                   ],
                 ),
@@ -725,8 +718,7 @@ class _AddMoneySheetState extends ConsumerState<_AddMoneySheet> {
   Future<void> _confirm() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final amount =
-        double.tryParse(_amountCtrl.text.replaceAll(',', ''));
+    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', ''));
     if (amount == null || amount <= 0) return;
 
     final uid = ref.read(authStateProvider).valueOrNull?.uid;
@@ -755,17 +747,16 @@ class _AddMoneySheetState extends ConsumerState<_AddMoneySheet> {
       );
       await ref.read(expenseRepositoryProvider).add(expense);
 
-      // 2. Update goal saved amount
-      final newSaved = widget.goal.savedAmount + amount;
-      final isCompleted = newSaved >= widget.goal.targetAmount;
+      // 2. Update goal saved amount atomically to avoid race conditions.
+      final projectedSaved = widget.goal.savedAmount + amount;
       await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
           .collection('goals')
           .doc(widget.goal.id)
           .update({
-        'savedAmount': newSaved,
-        'isCompleted': isCompleted,
+        'savedAmount': FieldValue.increment(amount),
+        'isCompleted': projectedSaved >= widget.goal.targetAmount,
         'updatedAt': now.toIso8601String(),
       });
 
@@ -822,14 +813,12 @@ class _AddMoneySheetState extends ConsumerState<_AddMoneySheet> {
               decoration: BoxDecoration(
                 color: primary.withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(
-                    color: primary.withValues(alpha: 0.2)),
+                border: Border.all(color: primary.withValues(alpha: 0.2)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline_rounded,
-                      size: 16, color: primary),
+                  Icon(Icons.info_outline_rounded, size: 16, color: primary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(

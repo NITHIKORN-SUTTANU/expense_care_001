@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/router/app_router.dart';
 import '../providers/budget_alert_provider.dart';
+import '../../features/recurring/providers/recurring_check_provider.dart';
 
 class MainShell extends ConsumerWidget {
   const MainShell({super.key, required this.child});
@@ -43,79 +44,128 @@ class MainShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Keep the budget alert notifier alive for the entire shell session.
+    // Keep these notifiers alive for the entire shell session.
     ref.watch(budgetAlertProvider);
+    ref.watch(recurringCheckProvider);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentIndex = _currentIndex(context);
+    final primaryColor = isDark ? AppColors.darkPrimary : AppColors.primary;
+    final mutedColor = isDark ? AppColors.darkMuted : AppColors.muted;
+    final navBg =
+        isDark ? AppColors.darkNavBackground : AppColors.navBackground;
+    final dividerColor = isDark ? AppColors.darkDivider : AppColors.divider;
 
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkNavBackground : AppColors.navBackground,
-          border: Border(
-            top: BorderSide(
-              color: isDark ? AppColors.darkDivider : AppColors.divider,
-              width: 1,
-            ),
-          ),
-        ),
-        child: SafeArea(
-          child: SizedBox(
-            height: 64,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(_tabs.length, (index) {
-                final tab = _tabs[index];
-                final isActive = currentIndex == index;
-                final primaryColor =
-                    isDark ? AppColors.darkPrimary : AppColors.primary;
-                final mutedColor =
-                    isDark ? AppColors.darkMuted : AppColors.muted;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 840;
 
-                return Expanded(
-                  child: InkWell(
-                    onTap: () => context.go(tab.route),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Active top-bar indicator
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: isActive ? 20 : 0,
-                          height: 2,
-                          decoration: BoxDecoration(
-                            color: primaryColor,
-                            borderRadius: BorderRadius.circular(1),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Icon(
-                          isActive ? tab.activeIcon : tab.inactiveIcon,
-                          size: 24,
-                          color: isActive ? primaryColor : mutedColor,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          tab.label,
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            fontWeight:
-                                isActive ? FontWeight.w600 : FontWeight.w400,
-                            color: isActive ? primaryColor : mutedColor,
-                          ),
-                        ),
-                      ],
-                    ),
+        if (isWide) {
+          // ── Wide layout: NavigationRail on the left ─────────────────────────
+          final isExtended = constraints.maxWidth >= 1200;
+          return Scaffold(
+            body: Row(
+              children: [
+                NavigationRail(
+                  backgroundColor: navBg,
+                  selectedIndex: currentIndex,
+                  onDestinationSelected: (i) => context.go(_tabs[i].route),
+                  extended: isExtended,
+                  labelType: isExtended
+                      ? NavigationRailLabelType.none
+                      : NavigationRailLabelType.all,
+                  leading: const SizedBox(height: 8),
+                  selectedIconTheme: IconThemeData(color: primaryColor),
+                  unselectedIconTheme: IconThemeData(color: mutedColor),
+                  selectedLabelTextStyle: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: primaryColor,
                   ),
-                );
-              }),
+                  unselectedLabelTextStyle: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: mutedColor,
+                  ),
+                  destinations: _tabs
+                      .map((tab) => NavigationRailDestination(
+                            icon: Icon(tab.inactiveIcon),
+                            selectedIcon: Icon(tab.activeIcon),
+                            label: Text(tab.label),
+                          ))
+                      .toList(),
+                ),
+                VerticalDivider(width: 1, thickness: 1, color: dividerColor),
+                Expanded(child: child),
+              ],
+            ),
+          );
+        }
+
+        // ── Narrow layout: bottom nav ─────────────────────────────────────────
+        return Scaffold(
+          body: child,
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              color: navBg,
+              border: Border(
+                top: BorderSide(color: dividerColor, width: 1),
+              ),
+            ),
+            child: SafeArea(
+              child: SizedBox(
+                height: 64,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: List.generate(_tabs.length, (index) {
+                    final tab = _tabs[index];
+                    final isActive = currentIndex == index;
+
+                    return Expanded(
+                      child: InkWell(
+                        onTap: () => context.go(tab.route),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Active top-bar indicator
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: isActive ? 20 : 0,
+                              height: 2,
+                              decoration: BoxDecoration(
+                                color: primaryColor,
+                                borderRadius: BorderRadius.circular(1),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Icon(
+                              isActive ? tab.activeIcon : tab.inactiveIcon,
+                              size: 24,
+                              color: isActive ? primaryColor : mutedColor,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              tab.label,
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: isActive
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                color: isActive ? primaryColor : mutedColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

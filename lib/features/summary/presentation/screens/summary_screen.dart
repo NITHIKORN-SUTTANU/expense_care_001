@@ -13,6 +13,7 @@ import '../../../../core/utils/app_date_utils.dart';
 import '../../../../shared/providers/user_preferences_provider.dart';
 import '../../../../shared/widgets/app_bottom_sheet.dart';
 import '../../../../shared/widgets/app_date_picker.dart';
+import '../../../../shared/widgets/error_snackbar.dart';
 import '../../../expense/data/expense_repository.dart';
 import '../../../expense/domain/models/category_model.dart';
 import '../../../expense/domain/models/expense_model.dart';
@@ -31,9 +32,9 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
   static const _periods = ['Day', 'Week', 'Month', 'Custom'];
 
   int _selectedPeriod = 2; // default: Month
-  int _prevPeriod = 2;
   DateTime? _customStart;
   DateTime? _customEnd;
+  bool _customIsRange = false;
 
   // ── Date range computation ─────────────────────────────────────────────────
 
@@ -47,8 +48,13 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
         return DateRangeKey(
             AppDateUtils.startOfWeek(now), AppDateUtils.endOfDay(now));
       case 3:
-        if (_customStart != null && _customEnd != null) {
-          return DateRangeKey(_customStart!, _customEnd!);
+        if (_customStart != null) {
+          if (_customIsRange && _customEnd != null) {
+            return DateRangeKey(_customStart!, _customEnd!);
+          } else if (!_customIsRange) {
+            return DateRangeKey(AppDateUtils.startOfDay(_customStart!),
+                AppDateUtils.endOfDay(_customStart!));
+          }
         }
         // fallback while picker is open
         return DateRangeKey(
@@ -73,51 +79,57 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
       case 2:
         return DateFormat('MMMM y').format(now);
       case 3:
-        if (_customStart != null && _customEnd != null) {
-          final startStr = _customStart!.year == _customEnd!.year
-              ? DateFormat('MMM d').format(_customStart!)
-              : DateFormat('MMM d, y').format(_customStart!);
-          return '$startStr – ${DateFormat('MMM d, y').format(_customEnd!)}';
+        if (_customStart != null) {
+          if (!_customIsRange) {
+            return DateFormat('EEE, d MMM y').format(_customStart!);
+          }
+          if (_customEnd != null) {
+            final startStr = _customStart!.year == _customEnd!.year
+                ? DateFormat('MMM d').format(_customStart!)
+                : DateFormat('MMM d, y').format(_customStart!);
+            return '$startStr – ${DateFormat('MMM d, y').format(_customEnd!)}';
+          }
         }
-        return 'Selecting range…';
+        return 'Selecting…';
       default:
         return '';
     }
   }
 
-  // ── Custom date range picker ───────────────────────────────────────────────
+  // ── Custom period picker ───────────────────────────────────────────────────
 
-  Future<void> _pickCustomRange() async {
-    final now = DateTime.now();
-    final picked = await showAppDateRangePicker(
+  Future<void> _pickCustom() async {
+    final result = await showAppCustomPeriodPicker(
       context: context,
       firstDate: DateTime(2020),
-      lastDate: now,
-      initialRange: (_customStart != null && _customEnd != null)
-          ? DateTimeRange(start: _customStart!, end: _customEnd!)
-          : DateTimeRange(start: AppDateUtils.startOfMonth(now), end: now),
+      lastDate: DateTime.now(),
+      initialIsRange: _customIsRange,
+      initialStart: _customStart,
+      initialEnd: _customEnd,
     );
     if (!mounted) return;
-    if (picked == null) {
-      setState(() => _selectedPeriod = _prevPeriod);
+    if (result == null) {
+      // Dismissed without confirming — always stay on the Custom tab.
     } else {
       setState(() {
-        _customStart = AppDateUtils.startOfDay(picked.start);
-        _customEnd = AppDateUtils.endOfDay(picked.end);
+        _customIsRange = result.isRange;
+        _customStart = AppDateUtils.startOfDay(result.start);
+        _customEnd =
+            result.end != null ? AppDateUtils.endOfDay(result.end!) : null;
       });
     }
   }
 
   void _onPeriodTap(int i) {
     if (i == 3) {
-      _prevPeriod = _selectedPeriod;
       setState(() => _selectedPeriod = 3);
-      _pickCustomRange();
+      _pickCustom();
     } else {
       setState(() {
         _selectedPeriod = i;
         _customStart = null;
         _customEnd = null;
+        _customIsRange = false;
       });
     }
   }
@@ -182,12 +194,40 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                   onTap: _onPeriodTap,
                 ),
 
-                // Active range label
+                // Active range label — tappable when Custom is active so the
+                // user can adjust the selection without re-tapping the tab.
                 const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  _rangeLabel,
-                  style: AppTextStyles.labelSmall(
-                    color: isDark ? AppColors.darkMuted : AppColors.muted,
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: _selectedPeriod == 3 ? _pickCustom : null,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _rangeLabel,
+                          style: AppTextStyles.labelSmall(
+                            color: _selectedPeriod == 3
+                                ? (isDark
+                                    ? AppColors.darkPrimary
+                                    : AppColors.primary)
+                                : (isDark
+                                    ? AppColors.darkMuted
+                                    : AppColors.muted),
+                          ),
+                        ),
+                        if (_selectedPeriod == 3) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.edit_calendar_rounded,
+                            size: 13,
+                            color: isDark
+                                ? AppColors.darkPrimary
+                                : AppColors.primary,
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
 
@@ -442,6 +482,7 @@ class _StatCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Expanded(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
@@ -452,6 +493,7 @@ class _StatCell extends StatelessWidget {
                     : AppColors.onBackground,
               ),
               overflow: TextOverflow.ellipsis,
+              maxLines: 1,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 2),
@@ -460,6 +502,7 @@ class _StatCell extends StatelessWidget {
               style: AppTextStyles.labelSmall(
                 color: isDark ? AppColors.darkMuted : AppColors.muted,
               ),
+              maxLines: 1,
               textAlign: TextAlign.center,
             ),
           ],
@@ -781,11 +824,50 @@ class _CategoryExpensesSheet extends ConsumerWidget {
                   : (cat?.name ?? '—');
 
               return InkWell(
-                onTap: () => showAppBottomSheet(
-                  context: context,
-                  title: 'Edit Expense',
-                  child: AddExpenseScreen(expense: expense),
-                ),
+                onTap: expense.isRecurring
+                    ? () => showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Auto-generated Expense'),
+                            content: const Text(
+                              'This expense was generated from a recurring rule. '
+                              'You can remove this occurrence without affecting the rule.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () async {
+                                  Navigator.pop(ctx);
+                                  try {
+                                    await ref
+                                        .read(expenseRepositoryProvider)
+                                        .delete(expense.userId, expense.id);
+                                  } catch (_) {
+                                    if (context.mounted) {
+                                      showErrorSnackBar(context,
+                                          'Failed to delete. Please try again.');
+                                    }
+                                  }
+                                },
+                                child: const Text(
+                                  'Delete Occurrence',
+                                  style: TextStyle(
+                                    color: AppColors.error,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                    : () => showAppBottomSheet(
+                          context: context,
+                          title: 'Edit Expense',
+                          child: AddExpenseScreen(expense: expense),
+                        ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.md,

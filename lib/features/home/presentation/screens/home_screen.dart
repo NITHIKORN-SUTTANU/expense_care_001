@@ -1,48 +1,24 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
-import '../../../../core/services/notification_service.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/connectivity_provider.dart';
 import '../../../../shared/providers/user_preferences_provider.dart';
 import '../../../../shared/widgets/app_bottom_sheet.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../shared/widgets/error_snackbar.dart';
 import '../../../expense/data/expense_repository.dart';
 import '../../../expense/domain/models/expense_model.dart';
 import '../../../expense/presentation/screens/add_expense_screen.dart';
 import '../../../profile/presentation/widgets/budget_limit_form.dart';
-import '../../../recurring/domain/models/recurring_expense_model.dart';
 import '../widgets/daily_budget_card.dart';
 import '../widgets/optional_budget_cards.dart';
 import '../widgets/recent_expenses_list.dart';
-
-DateTime _nextDue(String frequency, DateTime base) => switch (frequency) {
-      'daily' => base.add(const Duration(days: 1)),
-      'weekly' => base.add(const Duration(days: 7)),
-      'monthly' => _addMonths(base, 1),
-      'yearly' => _addMonths(base, 12),
-      _ => base,
-    };
-
-/// Advances [base] by [months], clamping the day to the last valid day of
-/// the target month (e.g. Jan 31 + 1 month → Feb 28/29, not Mar 2/3).
-DateTime _addMonths(DateTime base, int months) {
-  final totalMonth = base.month - 1 + months;
-  final year = base.year + totalMonth ~/ 12;
-  final month = totalMonth % 12 + 1;
-  final lastDay =
-      DateTime(year, month + 1, 0).day; // day 0 = last of prev month
-  return DateTime(year, month, base.day.clamp(1, lastDay));
-}
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -52,8 +28,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  bool _recurringChecked = false;
-
   String get _greeting {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Good morning';
@@ -81,15 +55,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
   }
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid != null) _runRecurringCheck(uid);
-    });
-  }
-
   void _openAddExpense(BuildContext context) {
     showAppBottomSheet(
       context: context,
@@ -99,6 +64,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _openEditExpense(BuildContext context, ExpenseModel expense) {
+    if (expense.isRecurring) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Auto-generated Expense'),
+          content: const Text(
+            'This expense was generated from a recurring rule. '
+            'You can remove this occurrence without affecting the rule.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  await ref
+                      .read(expenseRepositoryProvider)
+                      .delete(expense.userId, expense.id);
+                } catch (_) {
+                  if (context.mounted) {
+                    showErrorSnackBar(
+                        context, 'Failed to delete. Please try again.');
+                  }
+                }
+              },
+              child: const Text(
+                'Delete Occurrence',
+                style: TextStyle(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     showAppBottomSheet(
       context: context,
       title: 'Edit Expense',
@@ -115,126 +121,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Future<void> _runRecurringCheck(String uid) async {
-    if (_recurringChecked) return;
-    _recurringChecked = true;
-    try {
-      final now = DateTime.now();
-
-      final snap = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('recurring')
-          .where('isActive', isEqualTo: true)
-          .get();
-
-      if (snap.docs.isEmpty) return;
-
-      final batch = FirebaseFirestore.instance.batch();
-      bool hasWork = false;
-
-      for (final doc in snap.docs) {
-        final item = RecurringExpenseModel.fromMap(doc.data(), doc.id);
-        var due = item.nextDueDate;
-
-        // Skip if nothing is due yet
-        if (due.isAfter(now)) continue;
-
-        // Create one expense per missed occurrence
-        while (!due.isAfter(now)) {
-          final expRef = FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
-              .collection('expenses')
-              .doc('${item.id}_${due.millisecondsSinceEpoch}');
-
-          batch.set(
-            expRef,
-            {
-              'userId': uid,
-              'amount': item.amount,
-              'currency': item.currency,
-              'amountInBaseCurrency': item.amount,
-              'categoryId': item.categoryId,
-              'note': item.note ?? item.name,
-              'date': due.toIso8601String(),
-              'isRecurring': true,
-              'recurringId': item.id,
-              'goalId': null,
-              'receiptImageUrl': null,
-              'syncedToFirestore': true,
-              'createdAt': now.toIso8601String(),
-            },
-            SetOptions(merge: false),
-          );
-
-          due = _nextDue(item.frequency, due);
-          hasWork = true;
-        }
-
-        // Advance nextDueDate to the next future occurrence
-        batch.update(doc.reference, {'nextDueDate': due.toIso8601String()});
-      }
-
-      if (hasWork) await batch.commit();
-    } catch (_) {
-      // Allow retry next time the widget mounts if something went wrong
-      _recurringChecked = false;
-    }
-  }
-
-  Future<void> _checkBudgetAlerts(double total, double limit) async {
-    if (limit <= 0) return;
-    final pct = total / limit;
-    final prefs = await SharedPreferences.getInstance();
-    final today = DateTime.now().toIso8601String().substring(0, 10);
-
-    // 80% warning — also fires when spending jumps directly past 100%
-    if (pct >= 0.8) {
-      final key = 'budget_alert_80_$today';
-      if (prefs.getBool(key) != true) {
-        await prefs.setBool(key, true);
-        await NotificationService.instance.show(
-          id: 1,
-          title: 'Budget Warning',
-          body: "You've used 80% of your daily budget.",
-        );
-      }
-    }
-
-    if (pct >= 1.0) {
-      final key = 'budget_alert_100_$today';
-      if (prefs.getBool(key) != true) {
-        await prefs.setBool(key, true);
-        await NotificationService.instance.show(
-          id: 2,
-          title: 'Budget Exceeded',
-          body: "You've exceeded your daily budget!",
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Trigger check when auth resolves after mount (e.g. cold start)
-    ref.listen<AsyncValue<User?>>(authStateProvider, (_, next) {
-      next.whenData((user) {
-        if (user != null) _runRecurringCheck(user.uid);
-      });
-    });
-
-    // Fire budget alerts when daily spending crosses 80% or 100% of limit
-    ref.listen<AsyncValue<double>>(dailyTotalProvider, (prev, next) {
-      final prevTotal = prev?.valueOrNull ?? 0.0;
-      next.whenData((total) {
-        if (total <= prevTotal) return;
-        final limit =
-            ref.read(userPreferencesNotifierProvider)?.dailyLimit ?? 0.0;
-        _checkBudgetAlerts(total, limit);
-      });
-    });
-
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final user = ref.watch(userPreferencesNotifierProvider);
