@@ -60,8 +60,7 @@ class ExpenseRepository {
             0,
             (acc, d) =>
                 acc +
-                ((d.data()['amountInBaseCurrency'] as num?)?.toDouble() ??
-                    0)));
+                ((d.data()['amountInBaseCurrency'] as num?)?.toDouble() ?? 0)));
   }
 
   Stream<double> watchWeeklyTotal(String uid) {
@@ -77,8 +76,7 @@ class ExpenseRepository {
             0,
             (acc, d) =>
                 acc +
-                ((d.data()['amountInBaseCurrency'] as num?)?.toDouble() ??
-                    0)));
+                ((d.data()['amountInBaseCurrency'] as num?)?.toDouble() ?? 0)));
   }
 
   Stream<double> watchMonthlyTotal(String uid) {
@@ -94,8 +92,7 @@ class ExpenseRepository {
             0,
             (acc, d) =>
                 acc +
-                ((d.data()['amountInBaseCurrency'] as num?)?.toDouble() ??
-                    0)));
+                ((d.data()['amountInBaseCurrency'] as num?)?.toDouble() ?? 0)));
   }
 
   List<ExpenseModel> _toList(QuerySnapshot<Map<String, dynamic>> snap) =>
@@ -144,6 +141,7 @@ final expensesByDateRangeProvider =
 });
 
 /// Equatable key for [expensesByDateRangeProvider].
+/// Must implement == and hashCode so Riverpod detects parameter changes correctly.
 class DateRangeKey {
   const DateRangeKey(this.start, this.end);
   final DateTime start;
@@ -151,7 +149,7 @@ class DateRangeKey {
 
   @override
   bool operator ==(Object other) =>
-      other is DateRangeKey && other.start == start && other.end == end;
+      other is DateRangeKey && start == other.start && end == other.end;
 
   @override
   int get hashCode => Object.hash(start, end);

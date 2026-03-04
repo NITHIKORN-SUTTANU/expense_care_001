@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/router/app_router.dart';
 import '../providers/budget_alert_provider.dart';
+import '../providers/user_preferences_provider.dart';
 import '../../features/recurring/providers/recurring_check_provider.dart';
 
 class MainShell extends ConsumerWidget {
@@ -42,11 +43,41 @@ class MainShell extends ConsumerWidget {
     return 0;
   }
 
+  /// Navigates to [index] only if the user has set up a budget.
+  /// Non-Home tabs are blocked until at least a daily limit is saved.
+  void _onTabTap(BuildContext context, WidgetRef ref, int index) {
+    if (index != 0) {
+      final user = ref.read(userPreferencesNotifierProvider);
+      final budgetReady = user != null && user.dailyLimit > 0;
+      if (!budgetReady) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: const Text(
+                  'Please set up your daily budget on the Home tab first.'),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            ),
+          );
+        // Make sure the user is on Home so the setup prompt is visible.
+        if (_currentIndex(context) != 0) context.go(AppRoutes.home);
+        return;
+      }
+    }
+    context.go(_tabs[index].route);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Keep these notifiers alive for the entire shell session.
     ref.watch(budgetAlertProvider);
     ref.watch(recurringCheckProvider);
+
+    final user = ref.watch(userPreferencesNotifierProvider);
+    final budgetReady = user != null && user.dailyLimit > 0;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentIndex = _currentIndex(context);
@@ -69,7 +100,7 @@ class MainShell extends ConsumerWidget {
                 NavigationRail(
                   backgroundColor: navBg,
                   selectedIndex: currentIndex,
-                  onDestinationSelected: (i) => context.go(_tabs[i].route),
+                  onDestinationSelected: (i) => _onTabTap(context, ref, i),
                   extended: isExtended,
                   labelType: isExtended
                       ? NavigationRailLabelType.none
@@ -87,13 +118,22 @@ class MainShell extends ConsumerWidget {
                     fontWeight: FontWeight.w400,
                     color: mutedColor,
                   ),
-                  destinations: _tabs
-                      .map((tab) => NavigationRailDestination(
-                            icon: Icon(tab.inactiveIcon),
-                            selectedIcon: Icon(tab.activeIcon),
-                            label: Text(tab.label),
-                          ))
-                      .toList(),
+                  destinations: _tabs.asMap().entries.map((e) {
+                    final i = e.key;
+                    final tab = e.value;
+                    final isLocked = !budgetReady && i != 0;
+                    return NavigationRailDestination(
+                      icon: Opacity(
+                        opacity: isLocked ? 0.35 : 1.0,
+                        child: Icon(tab.inactiveIcon),
+                      ),
+                      selectedIcon: Icon(tab.activeIcon),
+                      label: Opacity(
+                        opacity: isLocked ? 0.35 : 1.0,
+                        child: Text(tab.label),
+                      ),
+                    );
+                  }).toList(),
                 ),
                 VerticalDivider(width: 1, thickness: 1, color: dividerColor),
                 Expanded(child: child),
@@ -120,10 +160,21 @@ class MainShell extends ConsumerWidget {
                   children: List.generate(_tabs.length, (index) {
                     final tab = _tabs[index];
                     final isActive = currentIndex == index;
+                    final isLocked = !budgetReady && index != 0;
+                    final iconColor = isLocked
+                        ? mutedColor.withAlpha(89)
+                        : isActive
+                            ? primaryColor
+                            : mutedColor;
+                    final textColor = isLocked
+                        ? mutedColor.withAlpha(89)
+                        : isActive
+                            ? primaryColor
+                            : mutedColor;
 
                     return Expanded(
                       child: InkWell(
-                        onTap: () => context.go(tab.route),
+                        onTap: () => _onTabTap(context, ref, index),
                         borderRadius: BorderRadius.circular(8),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -139,10 +190,25 @@ class MainShell extends ConsumerWidget {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            Icon(
-                              isActive ? tab.activeIcon : tab.inactiveIcon,
-                              size: 24,
-                              color: isActive ? primaryColor : mutedColor,
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  isActive ? tab.activeIcon : tab.inactiveIcon,
+                                  size: 24,
+                                  color: iconColor,
+                                ),
+                                if (isLocked)
+                                  Positioned(
+                                    right: -6,
+                                    bottom: -4,
+                                    child: Icon(
+                                      Icons.lock_rounded,
+                                      size: 11,
+                                      color: mutedColor.withAlpha(128),
+                                    ),
+                                  ),
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -152,7 +218,7 @@ class MainShell extends ConsumerWidget {
                                 fontWeight: isActive
                                     ? FontWeight.w600
                                     : FontWeight.w400,
-                                color: isActive ? primaryColor : mutedColor,
+                                color: textColor,
                               ),
                             ),
                           ],

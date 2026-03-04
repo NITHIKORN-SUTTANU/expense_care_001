@@ -235,21 +235,24 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                 const SizedBox(height: AppSpacing.sm),
 
                 // Data
-                expensesAsync.when(
-                  loading: () => const _LoadingBody(),
-                  error: (_, __) => const _ErrorBody(),
-                  data: (expenses) => expenses.isEmpty
-                      ? const _EmptyBody()
-                      : _SummaryBody(
-                          expenses: expenses,
-                          currency: currency,
-                          isDark: isDark,
-                          borderColor: borderColor,
-                          surfaceColor: surfaceColor,
-                          onCategoryTap: (cat) =>
-                              _openCategoryDetail(context, cat),
-                        ),
-                ),
+                if (_selectedPeriod == 3 && _customStart == null)
+                  const _CustomPickPrompt()
+                else
+                  expensesAsync.when(
+                    loading: () => const _LoadingBody(),
+                    error: (_, __) => const _ErrorBody(),
+                    data: (expenses) => expenses.isEmpty
+                        ? const _EmptyBody()
+                        : _SummaryBody(
+                            expenses: expenses,
+                            currency: currency,
+                            isDark: isDark,
+                            borderColor: borderColor,
+                            surfaceColor: surfaceColor,
+                            onCategoryTap: (cat) =>
+                                _openCategoryDetail(context, cat),
+                          ),
+                  ),
               ]),
             ),
           ),
@@ -966,6 +969,43 @@ class _CategoryExpensesSheetState
 }
 
 // ── Empty / Loading / Error states ────────────────────────────────────────────
+
+class _CustomPickPrompt extends StatelessWidget {
+  const _CustomPickPrompt();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48),
+      child: Column(
+        children: [
+          Icon(
+            Icons.edit_calendar_rounded,
+            size: 56,
+            color: isDark ? AppColors.darkMuted : AppColors.muted,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No date selected',
+            style: AppTextStyles.titleMedium(
+              color:
+                  isDark ? AppColors.darkOnBackground : AppColors.onBackground,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tap the calendar icon above to pick a date or range.',
+            style: AppTextStyles.bodyMedium(
+              color: isDark ? AppColors.darkMuted : AppColors.muted,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _EmptyBody extends StatelessWidget {
   const _EmptyBody();

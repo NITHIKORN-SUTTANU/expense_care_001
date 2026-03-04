@@ -76,8 +76,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen>
   }
 
   Future<void> _signInGoogle() async {
-    final ok =
-        await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+    final ok = await ref.read(authNotifierProvider.notifier).signInWithGoogle();
     if (ok && mounted) context.go(AppRoutes.home);
     if (!ok && mounted) _showError();
   }
@@ -108,15 +107,15 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen>
     final isLoading = ref.watch(authNotifierProvider).isLoading;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.darkBackground : AppColors.background,
+      backgroundColor: isDark ? AppColors.darkBackground : AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_rounded, color: onBg),
-          onPressed: () => context.pop(),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go(AppRoutes.landing),
         ),
       ),
       body: SafeArea(
@@ -258,7 +257,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen>
                           style: AppTextStyles.bodyMedium(color: muted),
                         ),
                         GestureDetector(
-                          onTap: () => context.pop(),
+                          onTap: () => context.go(AppRoutes.login),
                           child: Text(
                             'Log In',
                             style: GoogleFonts.poppins(

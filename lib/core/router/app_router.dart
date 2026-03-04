@@ -2,8 +2,11 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../features/auth/presentation/screens/landing_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
+import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/goals/presentation/screens/goals_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
@@ -13,6 +16,9 @@ import '../../shared/widgets/main_shell.dart';
 
 class AppRoutes {
   AppRoutes._();
+  static const String splash = '/splash';
+  static const String onboarding = '/onboarding';
+  static const String landing = '/landing';
   static const String login = '/login';
   static const String signup = '/signup';
   static const String home = '/home';
@@ -42,18 +48,41 @@ class _AuthRefreshNotifier extends ChangeNotifier {
 final _authRefreshNotifier = _AuthRefreshNotifier();
 
 final appRouter = GoRouter(
-  initialLocation: AppRoutes.home,
+  initialLocation: AppRoutes.splash,
   refreshListenable: _authRefreshNotifier,
   redirect: (context, state) {
     final isLoggedIn = FirebaseAuth.instance.currentUser != null;
     final loc = state.matchedLocation;
-    final isAuthRoute = loc == AppRoutes.login || loc == AppRoutes.signup;
 
-    if (!isLoggedIn && !isAuthRoute) return AppRoutes.login;
-    if (isLoggedIn && isAuthRoute) return AppRoutes.home;
+    // Splash handles its own navigation internally — never redirect from it.
+    if (loc == AppRoutes.splash) return null;
+
+    // Routes that unauthenticated users are allowed to visit.
+    const publicRoutes = {
+      AppRoutes.onboarding,
+      AppRoutes.landing,
+      AppRoutes.login,
+      AppRoutes.signup,
+    };
+    final isPublicRoute = publicRoutes.contains(loc);
+
+    if (!isLoggedIn && !isPublicRoute) return AppRoutes.onboarding;
+    if (isLoggedIn && isPublicRoute) return AppRoutes.home;
     return null;
   },
   routes: [
+    GoRoute(
+      path: AppRoutes.splash,
+      builder: (context, state) => const SplashScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.onboarding,
+      builder: (context, state) => const OnboardingScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.landing,
+      builder: (context, state) => const LandingScreen(),
+    ),
     GoRoute(
       path: AppRoutes.login,
       builder: (context, state) => const LoginScreen(),

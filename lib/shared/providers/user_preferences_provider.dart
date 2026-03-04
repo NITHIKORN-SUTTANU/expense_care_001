@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/theme/theme_notifier.dart';
 import '../../features/auth/domain/models/user_model.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 
@@ -14,7 +15,13 @@ class UserPreferencesNotifier extends StateNotifier<UserModel?> {
   final Ref _ref;
 
   // Called by the provider setup to keep state in sync with the stream.
-  void _seed(UserModel? user) => state = user;
+  // Also syncs the theme notifier so the app restores the saved theme on launch.
+  void _seed(UserModel? user) {
+    state = user;
+    if (user != null) {
+      _ref.read(themeProvider.notifier).fromString(user.themeMode);
+    }
+  }
 
   Future<void> updateLimits({
     required double dailyLimit,

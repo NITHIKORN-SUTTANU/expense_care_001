@@ -112,7 +112,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _BudgetSetupSheet(ref: ref),
+      isDismissible: true,
+      builder: (_) => const _BudgetSetupSheet(),
     );
   }
 
@@ -342,26 +343,64 @@ class _BudgetSetupPrompt extends StatelessWidget {
   }
 }
 
-// ── Budget setup bottom sheet ─────────────────────────────────────────────────
+// ── Budget setup bottom sheet (2-step wizard) ────────────────────────────────
 
-class _BudgetSetupSheet extends StatelessWidget {
-  const _BudgetSetupSheet({required this.ref});
-  final WidgetRef ref;
+// Currency list shared with profile screen.
+const _kCurrencies = [
+  ('THB', 'Thai Baht', '฿'),
+  ('USD', 'US Dollar', '\$'),
+  ('EUR', 'Euro', '€'),
+  ('GBP', 'British Pound', '£'),
+  ('JPY', 'Japanese Yen', '¥'),
+  ('CNY', 'Chinese Yuan', '¥'),
+  ('KRW', 'Korean Won', '₩'),
+  ('SGD', 'Singapore Dollar', 'S\$'),
+  ('AUD', 'Australian Dollar', 'A\$'),
+  ('CAD', 'Canadian Dollar', 'C\$'),
+  ('CHF', 'Swiss Franc', 'Fr'),
+  ('HKD', 'Hong Kong Dollar', 'HK\$'),
+  ('INR', 'Indian Rupee', '₹'),
+  ('MYR', 'Malaysian Ringgit', 'RM'),
+  ('IDR', 'Indonesian Rupiah', 'Rp'),
+  ('PHP', 'Philippine Peso', '₱'),
+  ('VND', 'Vietnamese Dong', '₫'),
+];
+
+class _BudgetSetupSheet extends ConsumerStatefulWidget {
+  const _BudgetSetupSheet();
+
+  @override
+  ConsumerState<_BudgetSetupSheet> createState() => _BudgetSetupSheetState();
+}
+
+class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
+  int _step = 0; // 0 = currency, 1 = budget
+  late String _selectedCurrency;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = ref.read(userPreferencesNotifierProvider);
+    _selectedCurrency = user?.preferredCurrency ?? 'USD';
+  }
+
+  void _goToStep2() => setState(() => _step = 1);
+  void _goBack() => setState(() => _step = 0);
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final user = ref.read(userPreferencesNotifierProvider);
-    final currency = user?.preferredCurrency ?? 'USD';
-    final currencySymbol =
-        NumberFormat.simpleCurrency(name: currency).currencySymbol;
+    final bg = isDark ? AppColors.darkSurface : AppColors.surface;
+    final dividerColor = isDark ? AppColors.darkDivider : AppColors.divider;
+    final onBg = isDark ? AppColors.darkOnBackground : AppColors.onBackground;
+    final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
 
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.88,
       ),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.surface,
+        color: bg,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(AppRadius.bottomSheetTop),
         ),
@@ -373,7 +412,7 @@ class _BudgetSetupSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Drag handle
+          // ── Drag handle ───────────────────────────────────────────
           Center(
             child: Container(
               width: 36,
@@ -381,55 +420,231 @@ class _BudgetSetupSheet extends StatelessWidget {
               margin: const EdgeInsets.only(
                   top: AppSpacing.xs, bottom: AppSpacing.xs),
               decoration: BoxDecoration(
-                color: isDark ? AppColors.darkDivider : AppColors.divider,
+                color: dividerColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
+
+          // ── Header row ────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
-            child: Text(
-              'Set Up Your Budget',
-              style: AppTextStyles.titleLarge(
-                color: isDark
-                    ? AppColors.darkOnBackground
-                    : AppColors.onBackground,
-              ),
+            child: Row(
+              children: [
+                if (_step == 1)
+                  Padding(
+                    padding: const EdgeInsets.only(right: AppSpacing.xs),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: _goBack,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(Icons.arrow_back_rounded,
+                            size: 20, color: onBg),
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _step == 0
+                            ? 'Choose Your Currency'
+                            : 'Set Up Your Budget',
+                        style: AppTextStyles.titleLarge(color: onBg),
+                      ),
+                      Text(
+                        'Step ${_step + 1} of 2',
+                        style: AppTextStyles.labelSmall(
+                          color: isDark ? AppColors.darkMuted : AppColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          Flexible(
-            child: SingleChildScrollView(
-              child: BudgetLimitForm(
-                dailyLimit: user?.dailyLimit ?? 0.0,
-                weeklyLimit: user?.weeklyLimit,
-                monthlyLimit: user?.monthlyLimit,
-                showWeekly: user?.showWeeklyOnHome ?? false,
-                showMonthly: user?.showMonthlyOnHome ?? false,
-                currencySymbol: currencySymbol,
-                onSave: ({
-                  required double daily,
-                  double? weekly,
-                  double? monthly,
-                  required bool showWeekly,
-                  required bool showMonthly,
-                }) async {
-                  await ref
-                      .read(userPreferencesNotifierProvider.notifier)
-                      .updateLimits(
-                        dailyLimit: daily,
-                        weeklyLimit: weekly,
-                        monthlyLimit: monthly,
-                        showWeeklyOnHome: showWeekly,
-                        showMonthlyOnHome: showMonthly,
-                      );
-                  if (context.mounted) Navigator.pop(context);
-                },
-              ),
-            ),
-          ),
+
+          Divider(height: 1, color: dividerColor),
+
+          // ── Step content ──────────────────────────────────────────
+          if (_step == 0)
+            ..._buildCurrencyStep(isDark, primary, dividerColor)
+          else
+            ..._buildBudgetStep(isDark),
         ],
       ),
     );
+  }
+
+  // ── Step 1: currency list ─────────────────────────────────────────────────
+
+  List<Widget> _buildCurrencyStep(
+    bool isDark,
+    Color primary,
+    Color dividerColor,
+  ) {
+    final onBg = isDark ? AppColors.darkOnBackground : AppColors.onBackground;
+    final bgColor = isDark ? AppColors.darkBackground : AppColors.background;
+
+    return [
+      Flexible(
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: _kCurrencies.length,
+          itemBuilder: (_, i) {
+            final (code, name, symbol) = _kCurrencies[i];
+            final isSelected = code == _selectedCurrency;
+            return InkWell(
+              onTap: () => setState(() => _selectedCurrency = code),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? primary.withValues(alpha: 0.08)
+                      : Colors.transparent,
+                  border: Border(
+                    bottom: BorderSide(color: dividerColor, width: 0.5),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? primary.withValues(alpha: 0.15)
+                            : bgColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          symbol,
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected
+                                ? primary
+                                : (isDark
+                                    ? AppColors.darkOnSurface
+                                    : AppColors.onSurface),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: AppTextStyles.titleMedium(color: onBg),
+                          ),
+                          Text(
+                            code,
+                            style: AppTextStyles.labelSmall(
+                              color: isDark
+                                  ? AppColors.darkMuted
+                                  : AppColors.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isSelected)
+                      Icon(Icons.check_circle_rounded,
+                          color: primary, size: 22),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.md),
+        child: SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _goToStep2,
+            style: ElevatedButton.styleFrom(
+              backgroundColor:
+                  isDark ? AppColors.darkPrimary : AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.button),
+              ),
+            ),
+            child: Text(
+              'Continue',
+              style: GoogleFonts.poppins(
+                  fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  // ── Step 2: budget limits ─────────────────────────────────────────────────
+
+  List<Widget> _buildBudgetStep(bool isDark) {
+    final user = ref.read(userPreferencesNotifierProvider);
+    final currencySymbol = NumberFormat.simpleCurrency(
+      name: _selectedCurrency,
+    ).currencySymbol;
+
+    return [
+      Flexible(
+        child: SingleChildScrollView(
+          child: BudgetLimitForm(
+            dailyLimit: user?.dailyLimit ?? 0.0,
+            weeklyLimit: user?.weeklyLimit,
+            monthlyLimit: user?.monthlyLimit,
+            showWeekly: user?.showWeeklyOnHome ?? false,
+            showMonthly: user?.showMonthlyOnHome ?? false,
+            currencySymbol: currencySymbol,
+            onSave: ({
+              required double daily,
+              double? weekly,
+              double? monthly,
+              required bool showWeekly,
+              required bool showMonthly,
+            }) async {
+              final notifier =
+                  ref.read(userPreferencesNotifierProvider.notifier);
+              // Save currency first (no-op if unchanged).
+              final currentCurrency = ref
+                      .read(userPreferencesNotifierProvider)
+                      ?.preferredCurrency ??
+                  'USD';
+              if (_selectedCurrency != currentCurrency) {
+                await notifier.updateCurrency(_selectedCurrency);
+              }
+              // Then save limits.
+              await notifier.updateLimits(
+                dailyLimit: daily,
+                weeklyLimit: weekly,
+                monthlyLimit: monthly,
+                showWeeklyOnHome: showWeekly,
+                showMonthlyOnHome: showMonthly,
+              );
+              if (context.mounted) Navigator.pop(context);
+            },
+          ),
+        ),
+      ),
+    ];
   }
 }

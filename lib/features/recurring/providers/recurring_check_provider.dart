@@ -136,7 +136,6 @@ class RecurringCheckNotifier extends Notifier<void> {
   }
 }
 
-final recurringCheckProvider =
-    NotifierProvider<RecurringCheckNotifier, void>(
+final recurringCheckProvider = NotifierProvider<RecurringCheckNotifier, void>(
   RecurringCheckNotifier.new,
 );
