@@ -21,6 +21,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../shared/providers/user_preferences_provider.dart';
 import '../../domain/models/category_model.dart';
 import '../widgets/category_selector.dart';
+import '../../../../shared/utils/expense_actions.dart';
 
 class AddExpenseScreen extends ConsumerStatefulWidget {
   const AddExpenseScreen({super.key, this.expense});
@@ -40,8 +41,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   String? _selectedCategoryId;
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
-  Uint8List? _pickedReceiptBytes;  // newly picked image (encoded to Base64 on save)
-  Uint8List? _existingReceiptBytes; // pre-decoded from expense.receiptBase64 in initState
+  Uint8List?
+      _pickedReceiptBytes; // newly picked image (encoded to Base64 on save)
+  Uint8List?
+      _existingReceiptBytes; // pre-decoded from expense.receiptBase64 in initState
   bool _receiptRemoved = false;
 
   // 500 KB raw → ~666 KB as Base64, comfortably within Firestore's 1 MB doc limit.
@@ -114,8 +117,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   Widget _buildReceiptSection(Color muted, Color divColor) {
     // Priority: newly picked > pre-decoded existing base64 (decoded in initState).
-    final displayBytes = _pickedReceiptBytes ??
-        (_receiptRemoved ? null : _existingReceiptBytes);
+    final displayBytes =
+        _pickedReceiptBytes ?? (_receiptRemoved ? null : _existingReceiptBytes);
     if (displayBytes != null) {
       return _ReceiptThumbnail(
         bytes: displayBytes,
@@ -241,23 +244,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   }
 
   Future<void> _delete() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete expense?'),
-        content: const Text('This cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+    final confirm = await showExpenseDeleteDialog(context, widget.expense!);
     if (confirm != true || !mounted) return;
 
     final uid = ref.read(authStateProvider).valueOrNull?.uid;
@@ -278,12 +265,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         final snap = await goalRef.get();
         if (snap.exists) {
           final data = snap.data()!;
-          final currentSaved =
-              (data['savedAmount'] as num?)?.toDouble() ?? 0.0;
+          final currentSaved = (data['savedAmount'] as num?)?.toDouble() ?? 0.0;
           final targetAmount = (data['targetAmount'] as num).toDouble();
-          final newSaved =
-              (currentSaved - expense.amountInBaseCurrency)
-                  .clamp(0.0, double.infinity);
+          final newSaved = (currentSaved - expense.amountInBaseCurrency)
+              .clamp(0.0, double.infinity);
           await goalRef.update({
             'savedAmount': newSaved,
             'isCompleted': newSaved >= targetAmount,
@@ -365,16 +350,14 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.darkBackground
-                      : AppColors.background,
+                  color:
+                      isDark ? AppColors.darkBackground : AppColors.background,
                   border: Border.all(color: divColor),
                   borderRadius: BorderRadius.circular(AppRadius.input),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.calendar_today_rounded,
-                        size: 18, color: muted),
+                    Icon(Icons.calendar_today_rounded, size: 18, color: muted),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -395,8 +378,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     style: AppTextStyles.labelLarge(color: muted)),
                 const SizedBox(height: AppSpacing.xxs),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
                     color: isDark
                         ? AppColors.darkBackground
@@ -414,8 +397,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                           style: AppTextStyles.bodyMedium(color: muted),
                         ),
                       ),
-                      Icon(Icons.lock_outline_rounded,
-                          size: 14, color: muted),
+                      Icon(Icons.lock_outline_rounded, size: 14, color: muted),
                     ],
                   ),
                 ),
@@ -504,12 +486,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.calendar_today_rounded,
-                        size: 18, color: muted),
+                    Icon(Icons.calendar_today_rounded, size: 18, color: muted),
                     const SizedBox(width: 10),
                     Text(
-                      DateFormat('EEE, MMM d · h:mm a')
-                          .format(_selectedDate),
+                      DateFormat('EEE, MMM d · h:mm a').format(_selectedDate),
                       style: AppTextStyles.bodyMedium(color: onBg),
                     ),
                   ],
@@ -614,8 +594,7 @@ class _ReceiptThumbnail extends StatelessWidget {
             bottom: 8,
             left: 8,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(6),

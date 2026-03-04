@@ -172,7 +172,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: selected ? primary : (isDark ? AppColors.darkOnBackground : AppColors.onBackground),
+                            color: selected
+                                ? primary
+                                : (isDark
+                                    ? AppColors.darkOnBackground
+                                    : AppColors.onBackground),
                           ),
                         ),
                       ),
@@ -183,7 +187,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         color: isDark
                             ? AppColors.darkOnBackground
                             : AppColors.onBackground,
-                      ).copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.w400),
+                      ).copyWith(
+                          fontWeight:
+                              selected ? FontWeight.w600 : FontWeight.w400),
                     ),
                     subtitle: Text(
                       code,
@@ -198,7 +204,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 },
               ),
             ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom + AppSpacing.xs),
+            SizedBox(
+                height: MediaQuery.of(context).padding.bottom + AppSpacing.xs),
           ],
         ),
       ),
@@ -231,9 +238,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 return;
               }
               Navigator.pop(dialogContext);
-              await ref
-                  .read(authRepositoryProvider)
-                  .updateDisplayName(newName);
+              await ref.read(authRepositoryProvider).updateDisplayName(newName);
             },
             child: const Text('Save'),
           ),
@@ -275,6 +280,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _handleDeleteAccount() async {
+    final authRepo = ref.read(authRepositoryProvider);
+    final provider = authRepo.currentUserProvider;
+    final isEmailProvider = provider == 'password';
+
+    // ── Step 1: confirmation dialog ──────────────────────────────────────
     final confirmed = await showDialog<bool>(
       context: context,
       useRootNavigator: false,
@@ -305,7 +315,71 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
     if (confirmed != true || !mounted) return;
 
-    // Show non-dismissible loading spinner while deleting.
+    // ── Step 2: re-auth — ask for password for email/password accounts ───
+    String? password;
+    if (isEmailProvider) {
+      final passwordCtrl = TextEditingController();
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      password = await showDialog<String>(
+        context: context,
+        useRootNavigator: false,
+        barrierDismissible: false,
+        builder: (ctx) {
+          bool obscure = true;
+          return StatefulBuilder(
+            builder: (ctx, setState) => AlertDialog(
+              title: const Text('Confirm Password'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Enter your password to confirm account deletion.',
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passwordCtrl,
+                    autofocus: true,
+                    obscureText: obscure,
+                    decoration: InputDecoration(
+                      hintText: 'Password',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscure
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded,
+                        ),
+                        onPressed: () => setState(() => obscure = !obscure),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, passwordCtrl.text),
+                  child: Text(
+                    'Confirm',
+                    style: TextStyle(
+                      color: isDark ? AppColors.darkError : AppColors.error,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      passwordCtrl.dispose();
+      if (!mounted || password == null || password.isEmpty) return;
+    }
+
+    // ── Step 3: loading spinner ──────────────────────────────────────────
+    if (!mounted) return;
     showDialog(
       context: context,
       useRootNavigator: false,
@@ -317,14 +391,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
 
     try {
-      await ref.read(authRepositoryProvider).deleteAccount();
+      await authRepo.deleteAccount(password: password);
       // GoRouter redirects to /login automatically via auth state change.
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // dismiss spinner
+      final message = e.toString().replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Failed to delete account. Please try again.'),
+          content: Text(message.isNotEmpty
+              ? message
+              : 'Failed to delete account. Please try again.'),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -390,8 +467,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _UserInfoSection(
                   isDark: isDark,
                   user: user,
-                  onEdit: () =>
-                      _handleEditName(user?.displayName ?? ''),
+                  onEdit: () => _handleEditName(user?.displayName ?? ''),
                 ),
 
                 const SizedBox(height: AppSpacing.sm),
@@ -467,6 +543,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           },
                         ),
                         showDivider: false,
+                        trailingBelow: true,
                       ),
                     ],
                   ),
@@ -681,6 +758,7 @@ class _ListTile extends StatelessWidget {
     this.onTap,
     this.labelColor,
     required this.showDivider,
+    this.trailingBelow = false,
   });
 
   final String label;
@@ -691,6 +769,7 @@ class _ListTile extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? labelColor;
   final bool showDivider;
+  final bool trailingBelow;
 
   @override
   Widget build(BuildContext context) {
@@ -703,45 +782,73 @@ class _ListTile extends StatelessWidget {
         InkWell(
           onTap: onTap,
           child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: 14,
-              ),
-              child: Row(
-                children: [
-                  if (leading != null) ...[
-                    leading!,
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          label,
-                          style: AppTextStyles.bodyMedium(
-                            color: labelColor ?? defaultColor,
-                          ).copyWith(fontWeight: FontWeight.w500),
-                        ),
-                        if (subtitle != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle!,
-                            style: AppTextStyles.labelSmall(
-                              color: isDark
-                                  ? AppColors.darkMuted
-                                  : AppColors.muted,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  if (trailing != null) trailing!,
-                ],
-              ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: 14,
             ),
+            child: trailingBelow
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (leading != null) ...[
+                        leading!,
+                        const SizedBox(height: 8)
+                      ],
+                      Text(
+                        label,
+                        style: AppTextStyles.bodyMedium(
+                          color: labelColor ?? defaultColor,
+                        ).copyWith(fontWeight: FontWeight.w500),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(subtitle!,
+                            style: AppTextStyles.labelSmall(
+                                color: isDark
+                                    ? AppColors.darkMuted
+                                    : AppColors.muted))
+                      ],
+                      if (trailing != null) ...[
+                        const SizedBox(height: 12),
+                        trailing!
+                      ],
+                    ],
+                  )
+                : Row(
+                    children: [
+                      if (leading != null) ...[
+                        leading!,
+                        const SizedBox(width: 12),
+                      ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label,
+                              style: AppTextStyles.bodyMedium(
+                                color: labelColor ?? defaultColor,
+                              ).copyWith(fontWeight: FontWeight.w500),
+                            ),
+                            if (subtitle != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle!,
+                                style: AppTextStyles.labelSmall(
+                                  color: isDark
+                                      ? AppColors.darkMuted
+                                      : AppColors.muted,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (trailing != null) trailing!,
+                    ],
+                  ),
           ),
+        ),
         if (showDivider)
           Divider(
             height: 1,

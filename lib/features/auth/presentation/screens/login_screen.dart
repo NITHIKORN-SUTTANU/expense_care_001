@@ -67,8 +67,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Future<void> _signInGoogle() async {
-    final ok =
-        await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+    final ok = await ref.read(authNotifierProvider.notifier).signInWithGoogle();
     if (ok && mounted) context.go(AppRoutes.home);
     if (!ok && mounted) _showError();
   }
@@ -80,9 +79,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
     setState(() => _forgotLoading = true);
     try {
-      await ref
-          .read(authRepositoryProvider)
-          .sendPasswordReset(_emailCtrl.text);
+      await ref.read(authRepositoryProvider).sendPasswordReset(_emailCtrl.text);
       if (mounted) _snack('Password reset email sent.');
     } catch (_) {
       if (mounted) _snack('Could not send reset email.', isError: true);
@@ -117,8 +114,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final isLoading = ref.watch(authNotifierProvider).isLoading;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppColors.darkBackground : AppColors.background,
+      backgroundColor: isDark ? AppColors.darkBackground : AppColors.background,
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnim,
@@ -201,11 +197,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       label: 'Password',
                       obscureText: _obscure,
                       textInputAction: TextInputAction.done,
-                      prefixIcon:
-                          Icon(Icons.lock_outline_rounded, size: 20, color: muted),
+                      prefixIcon: Icon(Icons.lock_outline_rounded,
+                          size: 20, color: muted),
                       onFieldSubmitted: (_) => _signIn(),
-                      validator: (v) =>
-                          v == null || v.isEmpty ? 'Password is required' : null,
+                      validator: (v) => v == null || v.isEmpty
+                          ? 'Password is required'
+                          : null,
                       onChanged: (_) => setState(() {}),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -257,18 +254,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
                     const SizedBox(height: AppSpacing.md),
 
-                    // ── Divider ──────────────────────────────────────────────
-                    _OrDivider(isDark: isDark),
-
-                    const SizedBox(height: AppSpacing.md),
-
-                    // ── Google ───────────────────────────────────────────────
-                    GoogleSignInButton(
-                      onPressed: isLoading ? null : _signInGoogle,
-                    ),
-
-                    const SizedBox(height: AppSpacing.xl),
-
                     // ── Sign up link ─────────────────────────────────────────
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -289,6 +274,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           ),
                         ),
                       ],
+                    ),
+
+                    const SizedBox(height: AppSpacing.md),
+
+                    // ── Divider ──────────────────────────────────────────────
+                    _OrDivider(isDark: isDark),
+
+                    const SizedBox(height: AppSpacing.md),
+
+                    // ── Google ───────────────────────────────────────────────
+                    GoogleSignInButton(
+                      onPressed: isLoading ? null : _signInGoogle,
                     ),
 
                     const SizedBox(height: AppSpacing.lg),

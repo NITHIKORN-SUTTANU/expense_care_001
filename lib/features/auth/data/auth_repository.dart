@@ -123,10 +123,8 @@ class AuthRepository {
   }
 
   Future<void> updateUser(UserModel user) async {
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .update({...user.toMap(), 'updatedAt': DateTime.now().toIso8601String()});
+    await _firestore.collection('users').doc(user.uid).update(
+        {...user.toMap(), 'updatedAt': DateTime.now().toIso8601String()});
   }
 
   Future<void> updateDisplayName(String displayName) async {
@@ -139,11 +137,73 @@ class AuthRepository {
     });
   }
 
-  Future<void> deleteAccount() async {
+  /// Returns the primary sign-in provider id for the current user.
+  /// e.g. 'password', 'google.com'
+  String? get currentUserProvider {
+    final user = _auth.currentUser;
+    if (user == null || user.providerData.isEmpty) return null;
+    return user.providerData.first.providerId;
+  }
+
+  Future<void> deleteAccount({String? password}) async {
     final user = _auth.currentUser;
     if (user == null) return;
+
+    // Firebase requires recent login before sensitive operations.
+    // Re-authenticate based on the user's sign-in provider.
+    try {
+      final provider = currentUserProvider;
+      if (provider == 'google.com') {
+        if (kIsWeb) {
+          await user.reauthenticateWithPopup(GoogleAuthProvider());
+        } else {
+          final googleUser = await _googleSignIn.signIn();
+          if (googleUser == null) {
+            throw const AuthFailure('Re-authentication cancelled.');
+          }
+          final googleAuth = await googleUser.authentication;
+          final credential = GoogleAuthProvider.credential(
+            accessToken: googleAuth.accessToken,
+            idToken: googleAuth.idToken,
+          );
+          await user.reauthenticateWithCredential(credential);
+        }
+      } else if (provider == 'password') {
+        if (password == null || password.isEmpty) {
+          throw const AuthFailure('Password is required to delete account.');
+        }
+        final credential = EmailAuthProvider.credential(
+          email: user.email!,
+          password: password,
+        );
+        await user.reauthenticateWithCredential(credential);
+      }
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure(_mapFirebaseError(e.code));
+    } on AuthFailure {
+      rethrow;
+    }
+
     final uid = user.uid;
-    await _firestore.collection('users').doc(uid).delete();
+    final userRef = _firestore.collection('users').doc(uid);
+
+    // Firestore does NOT cascade-delete subcollections when a parent document
+    // is deleted. Manually purge every subcollection in batches of 500 first.
+    for (final sub in ['expenses', 'goals', 'recurring']) {
+      var query = userRef.collection(sub).limit(500);
+      while (true) {
+        final snap = await query.get();
+        if (snap.docs.isEmpty) break;
+        final batch = _firestore.batch();
+        for (final doc in snap.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+        if (snap.docs.length < 500) break;
+      }
+    }
+
+    await userRef.delete();
     await user.delete();
   }
 
@@ -182,17 +242,15 @@ class AuthRepository {
 
   String _mapFirebaseError(String code) => switch (code) {
         'user-not-found' => 'No account found with this email.',
-        'wrong-password' || 'invalid-credential' =>
+        'wrong-password' ||
+        'invalid-credential' =>
           'Incorrect email or password.',
-        'email-already-in-use' =>
-          'An account with this email already exists.',
+        'email-already-in-use' => 'An account with this email already exists.',
         'weak-password' => 'Password is too weak.',
         'invalid-email' => 'Invalid email address.',
         'user-disabled' => 'This account has been disabled.',
-        'too-many-requests' =>
-          'Too many attempts. Please try again later.',
-        'network-request-failed' =>
-          'Network error. Check your connection.',
+        'too-many-requests' => 'Too many attempts. Please try again later.',
+        'network-request-failed' => 'Network error. Check your connection.',
         _ => 'Authentication failed. Please try again.',
       };
 }

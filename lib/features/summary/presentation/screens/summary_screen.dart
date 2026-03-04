@@ -18,6 +18,7 @@ import '../../../expense/data/expense_repository.dart';
 import '../../../expense/domain/models/category_model.dart';
 import '../../../expense/domain/models/expense_model.dart';
 import '../../../expense/presentation/screens/add_expense_screen.dart';
+import '../../../../../shared/utils/expense_actions.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -304,8 +305,7 @@ class _PeriodSelector extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.poppins(
                     fontSize: 13,
-                    fontWeight:
-                        isSelected ? FontWeight.w600 : FontWeight.w400,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                     color: isSelected
                         ? Colors.white
                         : (isDark ? AppColors.darkMuted : AppColors.muted),
@@ -452,8 +452,7 @@ class _StatsBar extends StatelessWidget {
                 color: borderColor,
                 indent: 4,
                 endIndent: 4),
-            _StatCell(
-                label: 'Transactions', value: count, isDark: isDark),
+            _StatCell(label: 'Transactions', value: count, isDark: isDark),
             VerticalDivider(
                 width: 1,
                 thickness: 1,
@@ -620,9 +619,9 @@ class _CategoryList extends StatelessWidget {
             final i = entry.key;
             final cat = entry.value;
             final isLast = i == categories.length - 1;
-            final formatted = NumberFormat.simpleCurrency(
-                    name: currency, decimalDigits: 2)
-                .format(cat.amount);
+            final formatted =
+                NumberFormat.simpleCurrency(name: currency, decimalDigits: 2)
+                    .format(cat.amount);
 
             return Column(
               children: [
@@ -726,7 +725,7 @@ class _CategoryList extends StatelessWidget {
 
 // ── Category Expenses Sheet ───────────────────────────────────────────────────
 
-class _CategoryExpensesSheet extends ConsumerWidget {
+class _CategoryExpensesSheet extends ConsumerStatefulWidget {
   const _CategoryExpensesSheet({
     required this.categoryId,
     required this.dateRangeKey,
@@ -736,18 +735,46 @@ class _CategoryExpensesSheet extends ConsumerWidget {
   final DateRangeKey dateRangeKey;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CategoryExpensesSheet> createState() =>
+      _CategoryExpensesSheetState();
+}
+
+class _CategoryExpensesSheetState
+    extends ConsumerState<_CategoryExpensesSheet> {
+  // ── Delete helpers ──────────────────────────────────────────────────────────
+
+  /// Deletes [expense] from Firestore.
+  /// For savings expenses linked to a goal, also decrements goal progress.
+  Future<void> _deleteExpense(ExpenseModel expense) async {
+    try {
+      await deleteExpenseAndSync(expense, ref.read(expenseRepositoryProvider));
+    } catch (_) {
+      if (mounted) {
+        showErrorSnackBar(context, 'Failed to delete. Please try again.');
+      }
+    }
+  }
+
+  /// Shows the canonical delete confirmation and returns true if confirmed.
+  Future<bool?> _confirmDelete(ExpenseModel expense) =>
+      showExpenseDeleteDialog(context, expense);
+
+  // ── Build ───────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final borderColor = isDark ? AppColors.darkDivider : AppColors.divider;
     final currency =
         ref.watch(userPreferencesNotifierProvider)?.preferredCurrency ?? 'USD';
-    final fmt =
-        NumberFormat.simpleCurrency(name: currency, decimalDigits: 2);
+    final fmt = NumberFormat.simpleCurrency(name: currency, decimalDigits: 2);
 
-    final allExpenses =
-        ref.watch(expensesByDateRangeProvider(dateRangeKey)).valueOrNull ?? [];
+    final allExpenses = ref
+            .watch(expensesByDateRangeProvider(widget.dateRangeKey))
+            .valueOrNull ??
+        [];
     final expenses = allExpenses
-        .where((e) => e.categoryId == categoryId)
+        .where((e) => e.categoryId == widget.categoryId)
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
 
@@ -806,8 +833,7 @@ class _CategoryExpensesSheet extends ConsumerWidget {
           child: ListView.separated(
             shrinkWrap: true,
             padding: EdgeInsets.only(
-              bottom:
-                  MediaQuery.of(context).padding.bottom + AppSpacing.xs,
+              bottom: MediaQuery.of(context).padding.bottom + AppSpacing.xs,
             ),
             itemCount: expenses.length,
             separatorBuilder: (_, __) => Divider(
@@ -823,121 +849,112 @@ class _CategoryExpensesSheet extends ConsumerWidget {
                   ? expense.note!
                   : (cat?.name ?? '—');
 
-              return InkWell(
-                onTap: expense.isRecurring
-                    ? () => showDialog(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Auto-generated Expense'),
-                            content: const Text(
-                              'This expense was generated from a recurring rule. '
-                              'You can remove this occurrence without affecting the rule.',
+              final rowContent = Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    // Date column
+                    SizedBox(
+                      width: 52,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            DateFormat('MMM d').format(expense.date),
+                            style: AppTextStyles.labelLarge(
+                              color: isDark
+                                  ? AppColors.darkOnBackground
+                                  : AppColors.onBackground,
                             ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () async {
-                                  Navigator.pop(ctx);
-                                  try {
-                                    await ref
-                                        .read(expenseRepositoryProvider)
-                                        .delete(expense.userId, expense.id);
-                                  } catch (_) {
-                                    if (context.mounted) {
-                                      showErrorSnackBar(context,
-                                          'Failed to delete. Please try again.');
-                                    }
-                                  }
-                                },
-                                child: const Text(
-                                  'Delete Occurrence',
-                                  style: TextStyle(
-                                    color: AppColors.error,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ),
-                        )
-                    : () => showAppBottomSheet(
-                          context: context,
-                          title: 'Edit Expense',
-                          child: AddExpenseScreen(expense: expense),
-                        ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: 14,
-                  ),
-                  child: Row(
-                    children: [
-                      // Date column
-                      SizedBox(
-                        width: 52,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              DateFormat('MMM d').format(expense.date),
-                              style: AppTextStyles.labelLarge(
-                                color: isDark
-                                    ? AppColors.darkOnBackground
-                                    : AppColors.onBackground,
-                              ),
+                          Text(
+                            DateFormat('h:mm a').format(expense.date),
+                            style: AppTextStyles.labelSmall(
+                              color: isDark
+                                  ? AppColors.darkMuted
+                                  : AppColors.muted,
                             ),
-                            Text(
-                              DateFormat('h:mm a').format(expense.date),
-                              style: AppTextStyles.labelSmall(
-                                color: isDark
-                                    ? AppColors.darkMuted
-                                    : AppColors.muted,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: AppSpacing.sm),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
 
-                      // Note
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: AppTextStyles.bodyMedium(
-                            color: isDark
-                                ? AppColors.darkOnBackground
-                                : AppColors.onBackground,
-                          ).copyWith(fontWeight: FontWeight.w500),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-
-                      // Amount + edit hint
-                      Text(
-                        fmt.format(expense.amountInBaseCurrency),
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                    // Note
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: AppTextStyles.bodyMedium(
                           color: isDark
                               ? AppColors.darkOnBackground
                               : AppColors.onBackground,
-                        ),
+                        ).copyWith(fontWeight: FontWeight.w500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        size: 16,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+
+                    // Amount + edit hint
+                    Text(
+                      fmt.format(expense.amountInBaseCurrency),
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                         color: isDark
-                            ? AppColors.darkMuted
-                            : AppColors.muted,
+                            ? AppColors.darkOnBackground
+                            : AppColors.onBackground,
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: isDark ? AppColors.darkMuted : AppColors.muted,
+                    ),
+                  ],
+                ),
+              );
+
+              // Tap handler: recurring → same delete dialog as swipe;
+              // regular / savings → open edit sheet.
+              void onTap() {
+                if (expense.isRecurring) {
+                  showExpenseDeleteDialog(context, expense)
+                      .then((confirmed) async {
+                    if (confirmed != true || !mounted) return;
+                    await _deleteExpense(expense);
+                  });
+                } else {
+                  showAppBottomSheet(
+                    context: context,
+                    title: 'Edit Expense',
+                    child: AddExpenseScreen(expense: expense),
+                  );
+                }
+              }
+
+              return Dismissible(
+                key: ValueKey(expense.id),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: AppSpacing.md),
+                  color: (isDark ? AppColors.darkError : AppColors.error)
+                      .withValues(alpha: 0.12),
+                  child: Icon(
+                    Icons.delete_outline_rounded,
+                    color: isDark ? AppColors.darkError : AppColors.error,
                   ),
+                ),
+                confirmDismiss: (_) => _confirmDelete(expense),
+                onDismissed: (_) => _deleteExpense(expense),
+                child: InkWell(
+                  onTap: onTap,
+                  child: rowContent,
                 ),
               );
             },
@@ -969,9 +986,8 @@ class _EmptyBody extends StatelessWidget {
           Text(
             'No expenses for this period',
             style: AppTextStyles.titleMedium(
-              color: isDark
-                  ? AppColors.darkOnBackground
-                  : AppColors.onBackground,
+              color:
+                  isDark ? AppColors.darkOnBackground : AppColors.onBackground,
             ),
           ),
           const SizedBox(height: 4),

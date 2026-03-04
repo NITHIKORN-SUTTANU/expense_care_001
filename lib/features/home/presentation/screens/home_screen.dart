@@ -19,6 +19,7 @@ import '../../../profile/presentation/widgets/budget_limit_form.dart';
 import '../widgets/daily_budget_card.dart';
 import '../widgets/optional_budget_cards.dart';
 import '../widgets/recent_expenses_list.dart';
+import '../../../../shared/utils/expense_actions.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -65,44 +66,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _openEditExpense(BuildContext context, ExpenseModel expense) {
     if (expense.isRecurring) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Auto-generated Expense'),
-          content: const Text(
-            'This expense was generated from a recurring rule. '
-            'You can remove this occurrence without affecting the rule.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                try {
-                  await ref
-                      .read(expenseRepositoryProvider)
-                      .delete(expense.userId, expense.id);
-                } catch (_) {
-                  if (context.mounted) {
-                    showErrorSnackBar(
-                        context, 'Failed to delete. Please try again.');
-                  }
-                }
-              },
-              child: const Text(
-                'Delete Occurrence',
-                style: TextStyle(
-                  color: AppColors.error,
-                  fontWeight: FontWeight.w700,
-                ),
+      // Show the same dialog used by swipe-to-delete for consistency.
+      final messenger = ScaffoldMessenger.of(context);
+      showExpenseDeleteDialog(context, expense).then((confirmed) async {
+        if (confirmed != true || !mounted) return;
+        try {
+          await deleteExpenseAndSync(
+              expense, ref.read(expenseRepositoryProvider));
+        } catch (_) {
+          if (mounted) {
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text('Failed to delete. Please try again.'),
               ),
-            ),
-          ],
-        ),
-      );
+            );
+          }
+        }
+      });
       return;
     }
     showAppBottomSheet(
@@ -110,6 +90,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       title: 'Edit Expense',
       child: AddExpenseScreen(expense: expense),
     );
+  }
+
+  /// Deletes [expense] from Firestore.
+  /// For savings expenses linked to a goal, also decrements the goal's progress.
+  Future<void> _deleteExpense(
+    BuildContext context,
+    ExpenseModel expense,
+  ) async {
+    try {
+      await deleteExpenseAndSync(expense, ref.read(expenseRepositoryProvider));
+    } catch (_) {
+      if (context.mounted) {
+        showErrorSnackBar(context, 'Failed to delete. Please try again.');
+      }
+    }
   }
 
   void _openBudgetSetup(BuildContext context) {
@@ -265,6 +260,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     onSeeAll: () => context.go(AppRoutes.summary),
                     onExpenseTap: (expense) =>
                         _openEditExpense(context, expense),
+                    onDelete: (expense) => _deleteExpense(context, expense),
                   ),
                 ]),
               ),

@@ -66,8 +66,7 @@ class RecurringExpensesScreen extends ConsumerWidget {
           SliverAppBar(
             pinned: true,
             expandedHeight: 0,
-            backgroundColor:
-                isDark ? AppColors.darkSurface : AppColors.surface,
+            backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
             titleSpacing: 4,
             title: Text(
               'Recurring Expenses',
@@ -93,7 +92,6 @@ class RecurringExpensesScreen extends ConsumerWidget {
               ),
             ),
           ),
-
           if (items.isEmpty)
             SliverFillRemaining(
               child: EmptyState(
@@ -172,16 +170,17 @@ class _RecurringCard extends StatelessWidget {
       confirmDismiss: (_) async {
         return await showDialog<bool>(
           context: context,
-          builder: (_) => AlertDialog(
+          useRootNavigator: false,
+          builder: (dialogCtx) => AlertDialog(
             title: const Text('Delete Recurring Expense'),
             content: Text('Remove "${item.name}" from recurring expenses?'),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context, false),
+                onPressed: () => Navigator.pop(dialogCtx, false),
                 child: const Text('Cancel'),
               ),
               TextButton(
-                onPressed: () => Navigator.pop(context, true),
+                onPressed: () => Navigator.pop(dialogCtx, true),
                 child: Text(
                   'Delete',
                   style: TextStyle(
@@ -205,7 +204,9 @@ class _RecurringCard extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppRadius.card),
               border: Border.all(
-                color: item.isActive ? borderColor : borderColor.withValues(alpha: 0.5),
+                color: item.isActive
+                    ? borderColor
+                    : borderColor.withValues(alpha: 0.5),
               ),
             ),
             padding: const EdgeInsets.all(AppSpacing.sm),
@@ -311,9 +312,7 @@ class _RecurringCard extends StatelessWidget {
                             : '—',
                         style: AppTextStyles.labelSmall(
                           color: isOverdue && item.isActive
-                              ? (isDark
-                                  ? AppColors.darkError
-                                  : AppColors.error)
+                              ? (isDark ? AppColors.darkError : AppColors.error)
                               : muted,
                         ),
                       ),
@@ -391,8 +390,7 @@ class _RecurringFormSheetState extends ConsumerState<_RecurringFormSheet> {
     _nameCtrl = TextEditingController(text: g?.name ?? '');
     _amountCtrl = TextEditingController(
       text: g != null
-          ? g.amount.toStringAsFixed(
-              g.amount == g.amount.truncate() ? 0 : 2)
+          ? g.amount.toStringAsFixed(g.amount == g.amount.truncate() ? 0 : 2)
           : '',
     );
     _noteCtrl = TextEditingController(text: g?.note ?? '');
@@ -463,7 +461,9 @@ class _RecurringFormSheetState extends ConsumerState<_RecurringFormSheet> {
           .delete();
       if (mounted) Navigator.pop(context);
     } catch (_) {
-      if (mounted) showErrorSnackBar(context, 'Failed to delete. Please try again.');
+      if (mounted) {
+        showErrorSnackBar(context, 'Failed to delete. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -531,8 +531,7 @@ class _RecurringFormSheetState extends ConsumerState<_RecurringFormSheet> {
           const kChunk = 490;
           final docs = expSnap.docs;
           for (var i = 0; i < docs.length; i += kChunk) {
-            final chunk = docs.sublist(
-                i, (i + kChunk).clamp(0, docs.length));
+            final chunk = docs.sublist(i, (i + kChunk).clamp(0, docs.length));
             final expBatch = FirebaseFirestore.instance.batch();
             for (final doc in chunk) {
               expBatch.update(doc.reference, {
@@ -576,7 +575,9 @@ class _RecurringFormSheetState extends ConsumerState<_RecurringFormSheet> {
       if (mounted) {
         showErrorSnackBar(
           context,
-          _isEditing ? 'Failed to update. Please try again.' : 'Failed to save. Please try again.',
+          _isEditing
+              ? 'Failed to update. Please try again.'
+              : 'Failed to save. Please try again.',
         );
       }
     } finally {
@@ -665,8 +666,7 @@ class _RecurringFormSheetState extends ConsumerState<_RecurringFormSheet> {
                         color: selected
                             ? primary.withValues(alpha: 0.12)
                             : Colors.transparent,
-                        borderRadius:
-                            BorderRadius.circular(AppRadius.chip + 2),
+                        borderRadius: BorderRadius.circular(AppRadius.chip + 2),
                         border: Border.all(
                           color: selected ? primary : divColor,
                           width: selected ? 1.5 : 1,

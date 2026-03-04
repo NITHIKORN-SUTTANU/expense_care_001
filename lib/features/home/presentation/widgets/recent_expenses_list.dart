@@ -6,6 +6,7 @@ import '../../../expense/domain/models/category_model.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../shared/utils/expense_actions.dart';
 
 class RecentExpensesList extends StatelessWidget {
   const RecentExpensesList({
@@ -13,11 +14,15 @@ class RecentExpensesList extends StatelessWidget {
     required this.expenses,
     this.onSeeAll,
     this.onExpenseTap,
+    this.onDelete,
   });
 
   final List<ExpenseModel> expenses;
   final VoidCallback? onSeeAll;
   final ValueChanged<ExpenseModel>? onExpenseTap;
+
+  /// Called after the user confirms swipe-to-delete on an expense row.
+  final ValueChanged<ExpenseModel>? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -85,10 +90,30 @@ class RecentExpensesList extends StatelessWidget {
                   indent: 68,
                 ),
                 itemBuilder: (context, index) {
-                  return _ExpenseRow(
-                    expense: expenses[index],
+                  final expense = expenses[index];
+                  final row = _ExpenseRow(
+                    expense: expense,
                     isDark: isDark,
-                    onTap: () => onExpenseTap?.call(expenses[index]),
+                    onTap: () => onExpenseTap?.call(expense),
+                  );
+                  if (onDelete == null) return row;
+                  return Dismissible(
+                    key: ValueKey(expense.id),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: AppSpacing.md),
+                      color: (isDark ? AppColors.darkError : AppColors.error)
+                          .withValues(alpha: 0.12),
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        color: isDark ? AppColors.darkError : AppColors.error,
+                      ),
+                    ),
+                    confirmDismiss: (_) =>
+                        showExpenseDeleteDialog(context, expense),
+                    onDismissed: (_) => onDelete!.call(expense),
+                    child: row,
                   );
                 },
               ),
