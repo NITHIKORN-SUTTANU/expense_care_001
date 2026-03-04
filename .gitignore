@@ -52,3 +52,6 @@ ios/Runner/GoogleService-Info.plist
 
 # Internal project documents — not for public repos
 expense_care_requirements.md
+
+# AI assistant config
+.claude/
