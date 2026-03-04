@@ -102,6 +102,7 @@ class MainShell extends ConsumerWidget {
                   selectedIndex: currentIndex,
                   onDestinationSelected: (i) => _onTabTap(context, ref, i),
                   extended: isExtended,
+                  indicatorColor: Colors.transparent,
                   labelType: isExtended
                       ? NavigationRailLabelType.none
                       : NavigationRailLabelType.all,
