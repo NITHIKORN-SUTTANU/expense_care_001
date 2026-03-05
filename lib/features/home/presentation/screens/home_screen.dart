@@ -16,6 +16,7 @@ import '../../../expense/data/expense_repository.dart';
 import '../../../expense/domain/models/expense_model.dart';
 import '../../../expense/presentation/screens/add_expense_screen.dart';
 import '../../../profile/presentation/widgets/budget_limit_form.dart';
+import '../widgets/ai_chat_card.dart';
 import '../widgets/daily_budget_card.dart';
 import '../widgets/optional_budget_cards.dart';
 import '../widgets/recent_expenses_list.dart';
@@ -255,6 +256,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     showMonthly: showMonthly,
                     currency: currency,
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  const AiChatCard(),
                   const SizedBox(height: AppSpacing.md),
                   RecentExpensesList(
                     expenses: recentExpenses,
