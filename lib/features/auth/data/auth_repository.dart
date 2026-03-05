@@ -63,8 +63,11 @@ class AuthRepository {
       if (kIsWeb) {
         // On web, use Firebase Auth's signInWithPopup — avoids the deprecated
         // google_sign_in signIn() that can't reliably return an idToken on web.
-        final userCredential =
-            await _auth.signInWithPopup(GoogleAuthProvider());
+        // prompt: select_account forces the account picker in PWA/standalone mode
+        // where Google would otherwise silently reuse the last signed-in account.
+        final provider = GoogleAuthProvider()
+          ..setCustomParameters({'prompt': 'select_account'});
+        final userCredential = await _auth.signInWithPopup(provider);
         return _fetchOrCreateUser(userCredential.user!);
       }
       final googleUser = await _googleSignIn.signIn();
@@ -155,7 +158,9 @@ class AuthRepository {
       final provider = currentUserProvider;
       if (provider == 'google.com') {
         if (kIsWeb) {
-          await user.reauthenticateWithPopup(GoogleAuthProvider());
+          final provider = GoogleAuthProvider()
+            ..setCustomParameters({'prompt': 'select_account'});
+          await user.reauthenticateWithPopup(provider);
         } else {
           final googleUser = await _googleSignIn.signIn();
           if (googleUser == null) {
