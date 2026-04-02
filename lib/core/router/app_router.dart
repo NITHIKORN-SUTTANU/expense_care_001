@@ -11,7 +11,6 @@ import '../../features/goals/presentation/screens/goals_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/recurring_expenses_screen.dart';
-import '../../features/ai_chat/presentation/screens/ai_chat_screen.dart';
 import '../../features/summary/presentation/screens/summary_screen.dart';
 import '../../shared/widgets/main_shell.dart';
 
@@ -27,7 +26,6 @@ class AppRoutes {
   static const String summary = '/summary';
   static const String profile = '/profile';
   static const String profileRecurring = '/profile/recurring';
-  static const String aiChat = '/ai-chat';
 }
 
 /// Listens to Firebase auth state and notifies GoRouter to re-evaluate redirects.
@@ -119,10 +117,6 @@ final appRouter = GoRouter(
           ],
         ),
       ],
-    ),
-    GoRoute(
-      path: AppRoutes.aiChat,
-      builder: (context, state) => const AiChatScreen(),
     ),
   ],
 );
