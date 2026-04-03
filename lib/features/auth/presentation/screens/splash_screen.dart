@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_durations.dart';
 import '../../../../core/router/app_router.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -32,10 +33,10 @@ class _SplashScreenState extends State<SplashScreen>
     );
     _animCtrl.forward();
 
-    // Wait at least 1.5 s, then navigate based on auth state.
+    // Wait for splash delay, then navigate based on auth state.
     // FirebaseAuth.instance.currentUser is synchronously available after
     // Firebase is initialised in main.dart.
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    Future.delayed(AppDurations.splashDelay, () {
       if (!mounted) return;
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/constants/app_durations.dart';
 import '../../../../features/expense/data/expense_repository.dart';
 import '../../../../features/goals/presentation/screens/goals_screen.dart';
 import '../../../../shared/providers/user_preferences_provider.dart';
@@ -60,7 +61,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: AppDurations.scrollAnimation,
           curve: Curves.easeOut,
         );
       }

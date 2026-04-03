@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/constants/time_config.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/providers/connectivity_provider.dart';
 import '../../../../shared/providers/user_preferences_provider.dart';
@@ -30,12 +31,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  String get _greeting {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
+  String get _greeting => TimeGreetings.getGreeting(DateTime.now().hour);
 
   String get _dateLabel {
     final now = DateTime.now();

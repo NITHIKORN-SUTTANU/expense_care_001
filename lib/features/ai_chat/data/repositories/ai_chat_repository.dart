@@ -1,9 +1,11 @@
 import 'package:firebase_vertexai/firebase_vertexai.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 class AiChatRepository {
   GenerativeModel? _model;
   ChatSession? _session;
   String _userContext = '';
+  String? _systemPromptTemplate;
 
   // Model is built with systemInstruction so the prompt is processed once
   // by the model infrastructure — not re-sent as history on every request.
@@ -14,22 +16,23 @@ class AiChatRepository {
     );
   }
 
+  /// Loads the system prompt template from assets if not already loaded
+  Future<String> _getSystemPromptTemplate() async {
+    if (_systemPromptTemplate == null) {
+      _systemPromptTemplate = await rootBundle.loadString(
+        'assets/prompts/ai_system_prompt.txt',
+      );
+    }
+    return _systemPromptTemplate!;
+  }
+
   String _buildSystemPrompt() {
+    // If template is not loaded yet, use it synchronously
+    // This should not happen in normal flow since setUserContext is called first
+    final basePrompt = _systemPromptTemplate ?? '';
+
     return '''
-You are BugJoy (บักจ่อย), a friendly financial buddy built into the ExpenseCare app. Think of yourself as a close friend who happens to be good with money — not a formal assistant.
-
-Talk the way a real person talks in a chat. Use casual, natural language. Vary your sentence length. Sometimes short. Sometimes a bit longer when you need to explain something. React naturally to what the user says, like you actually read and understood it.
-
-Always reply in the same language the user writes in. If they write Thai, reply in Thai. If English, reply in English. Match their tone — if they are casual, be casual back. If they seem worried, be warm and reassuring.
-
-FORMATTING RULES:
-- No markdown. No **, *, ##, or any symbols like that.
-- No emojis at all.
-- No bold or italic.
-- When listing things, just put each item on a new line starting with a dash: - item
-- Keep replies short. A few sentences for simple questions. A short paragraph or two for bigger topics.
-- Never start with filler like "Of course!", "Sure!", "Great question!" — just get straight to the point naturally.
-- Do not sound like a robot or a customer service script.
+$basePrompt
 
 $_userContext
 
@@ -43,7 +46,10 @@ If the data shows no expenses yet, say so honestly.
     return _session ??= _getModel().startChat();
   }
 
-  void setUserContext(String context) {
+  Future<void> setUserContext(String context) async {
+    // Load the template on first context set
+    await _getSystemPromptTemplate();
+
     _userContext = context;
     _model = null; // rebuild model with updated system instruction
     _session = null;

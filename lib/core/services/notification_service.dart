@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../constants/notification_config.dart';
 
 class NotificationService {
   NotificationService._();
@@ -47,10 +48,9 @@ class NotificationService {
     if (kIsWeb || !_initialized) return;
     try {
       const androidDetails = AndroidNotificationDetails(
-        'budget_alerts',
-        'Budget Alerts',
-        channelDescription:
-            'Notifications when you approach or exceed your budget limits',
+        NotificationConfig.budgetAlertsChannelId,
+        NotificationConfig.budgetAlertsChannelName,
+        channelDescription: NotificationConfig.budgetAlertsChannelDescription,
         importance: Importance.high,
         priority: Priority.high,
       );

@@ -1,0 +1,50 @@
+# Example .gitignore additions for sensitive data
+# Copy relevant lines to your main .gitignore file
+
+# ─────────────────────────────────────────────────────────
+# Environment Variables (if you add them in the future)
+# ─────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# ─────────────────────────────────────────────────────────
+# Optional: Firebase Configuration (for multiple environments)
+# ─────────────────────────────────────────────────────────
+# Uncomment these if you use different Firebase projects for dev/prod:
+# lib/firebase_options.dart
+# android/app/google-services.json
+# ios/Runner/GoogleService-Info.plist
+
+# ─────────────────────────────────────────────────────────
+# Private Keys and Certificates
+# ─────────────────────────────────────────────────────────
+*.jks
+*.keystore
+*.p12
+*.key
+*.pem
+*.private
+
+# ─────────────────────────────────────────────────────────
+# Local Development Files
+# ─────────────────────────────────────────────────────────
+.DS_Store
+*.log
+*.swp
+*.swo
+*~
+
+# ─────────────────────────────────────────────────────────
+# IDE Specific (optional)
+# ─────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/workspace.xml
+
+# ─────────────────────────────────────────────────────────
+# Build Output (for sensitive debug info)
+# ─────────────────────────────────────────────────────────
+app.*.symbols
+app.*.map.json

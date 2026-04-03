@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/theme_notifier.dart';
 import '../../features/auth/domain/models/user_model.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
+import '../../core/constants/firestore_constants.dart';
 
 /// Exposes the current user's Firestore document as a stream.
 /// Delegates to [currentUserProvider] which watches Firebase auth + Firestore.
@@ -57,21 +58,25 @@ class UserPreferencesNotifier extends StateNotifier<UserModel?> {
 
   Future<void> _relabelCurrency(String uid, String currency) async {
     final db = FirebaseFirestore.instance;
-    for (final collection in ['expenses', 'recurring', 'goals']) {
+    for (final collection in [
+      FirestoreCollections.expenses,
+      FirestoreCollections.recurring,
+      FirestoreCollections.goals
+    ]) {
       await _batchSetCurrency(db, uid, collection, currency);
     }
   }
 
   /// Updates the `currency` field on every document in [collection] using
-  /// paginated batches to stay within Firestore's 500-writes-per-batch limit.
+  /// paginated batches to stay within Firestore's write limit per batch.
   Future<void> _batchSetCurrency(
     FirebaseFirestore db,
     String uid,
     String collection,
     String currency,
   ) async {
-    const pageSize = 400;
-    final col = db.collection('users').doc(uid).collection(collection);
+    const pageSize = FirestoreConfig.defaultPageSize;
+    final col = db.collection(FirestoreCollections.users).doc(uid).collection(collection);
     QueryDocumentSnapshot? lastDoc;
 
     while (true) {

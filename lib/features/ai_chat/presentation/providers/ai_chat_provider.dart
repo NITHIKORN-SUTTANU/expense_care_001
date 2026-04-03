@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/ai_chat_repository.dart';
 import '../../domain/models/chat_message.dart';
+import '../../../../core/constants/app_durations.dart';
 
 final aiChatRepositoryProvider = Provider<AiChatRepository>(
   (_) => AiChatRepository(),
@@ -87,7 +88,7 @@ class AiChatNotifier extends StateNotifier<AiChatState> {
                 ],
               );
             } else {
-              // Subsequent chunks — batch UI updates at ~30ms to reduce repaints
+              // Subsequent chunks — batch UI updates to reduce repaints
               final updated = [...state.messages];
               updated[updated.length - 1] = ChatMessage(
                 text: buffer.toString(),
@@ -95,7 +96,7 @@ class AiChatNotifier extends StateNotifier<AiChatState> {
                 timestamp: aiTimestamp!,
               );
               pendingMessages = updated;
-              uiTimer ??= Timer(const Duration(milliseconds: 30), flushUi);
+              uiTimer ??= Timer(AppDurations.uiBatchUpdate, flushUi);
             }
           },
           onError: (e) {

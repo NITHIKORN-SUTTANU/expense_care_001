@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/constants/app_durations.dart';
 import '../../../../core/router/app_router.dart';
 
 class LandingScreen extends StatefulWidget {
@@ -23,7 +24,7 @@ class _LandingScreenState extends State<LandingScreen>
     super.initState();
     _entryCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: AppDurations.buttonAnimation,
     );
     _fadeAnim = CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(

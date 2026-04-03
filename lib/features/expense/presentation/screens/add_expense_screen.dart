@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/constants/image_config.dart';
 import '../../../../core/services/receipt_service.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/app_button.dart';
@@ -47,8 +48,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _existingReceiptBytes; // pre-decoded from expense.receiptBase64 in initState
   bool _receiptRemoved = false;
 
-  // 500 KB raw → ~666 KB as Base64, comfortably within Firestore's 1 MB doc limit.
-  static const _maxImageBytes = 500 * 1024;
+  // Raw image size limit (Base64 encoding adds ~33% overhead)
+  static const _maxImageBytes = ImageConfig.maxImageBytes;
 
   bool get _isEditing => widget.expense != null;
   bool get _isSavingsEdit =>

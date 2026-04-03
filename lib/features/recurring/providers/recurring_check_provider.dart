@@ -3,14 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/presentation/providers/auth_provider.dart';
 import '../data/recurring_repository.dart';
 import '../domain/models/recurring_expense_model.dart';
+import '../../../core/constants/firestore_constants.dart';
+import '../../../core/constants/recurrence_config.dart';
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
 DateTime _nextDue(String frequency, DateTime base) => switch (frequency) {
-      'daily' => base.add(const Duration(days: 1)),
-      'weekly' => base.add(const Duration(days: 7)),
-      'monthly' => _addMonths(base, 1),
-      'yearly' => _addMonths(base, 12),
+      RecurrenceFrequency.daily => base.add(const Duration(days: 1)),
+      RecurrenceFrequency.weekly => base.add(const Duration(days: 7)),
+      RecurrenceFrequency.monthly => _addMonths(base, 1),
+      RecurrenceFrequency.yearly => _addMonths(base, 12),
       _ => base,
     };
 
@@ -58,9 +60,9 @@ class RecurringCheckNotifier extends Notifier<void> {
       final now = DateTime.now();
 
       final snap = await FirebaseFirestore.instance
-          .collection('users')
+          .collection(FirestoreCollections.users)
           .doc(uid)
-          .collection('recurring')
+          .collection(FirestoreCollections.recurring)
           .where('isActive', isEqualTo: true)
           .get();
 
@@ -73,7 +75,7 @@ class RecurringCheckNotifier extends Notifier<void> {
       // recurring item for the nextDueDate update, so the expense writes are
       // capped to (490 − itemCount). This prevents silent batch-commit failures
       // when a recurring item has many missed occurrences (e.g. daily × years).
-      const kBatchLimit = 490;
+      const kBatchLimit = FirestoreConfig.batchLimitForRecurring;
       int opsUsed = 0;
 
       for (final doc in snap.docs) {
@@ -86,9 +88,9 @@ class RecurringCheckNotifier extends Notifier<void> {
 
         while (!due.isAfter(now) && opsUsed < kBatchLimit - 1) {
           final expRef = FirebaseFirestore.instance
-              .collection('users')
+              .collection(FirestoreCollections.users)
               .doc(uid)
-              .collection('expenses')
+              .collection(FirestoreCollections.expenses)
               .doc('${item.id}_${due.millisecondsSinceEpoch}');
 
           batch.set(

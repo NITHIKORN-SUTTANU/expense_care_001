@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/expense_model.dart';
 import '../../auth/presentation/providers/auth_provider.dart';
 import '../../../core/utils/app_date_utils.dart';
+import '../../../core/constants/firestore_constants.dart';
 
 class ExpenseRepository {
   ExpenseRepository({FirebaseFirestore? firestore})
@@ -11,7 +12,7 @@ class ExpenseRepository {
   final FirebaseFirestore _db;
 
   CollectionReference<Map<String, dynamic>> _ref(String uid) =>
-      _db.collection('users').doc(uid).collection('expenses');
+      _db.collection(FirestoreCollections.users).doc(uid).collection(FirestoreCollections.expenses);
 
   // ── Write ──────────────────────────────────────────────────────────────────
 

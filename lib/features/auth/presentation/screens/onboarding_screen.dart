@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/constants/app_durations.dart';
 import '../../../../core/router/app_router.dart';
 
 // ── Slide data ────────────────────────────────────────────────────────────────
@@ -133,7 +134,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               children: List.generate(
                 _slides.length,
                 (i) => AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
+                  duration: AppDurations.pageTransition,
                   curve: Curves.easeInOut,
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   width: i == _currentPage ? 24 : 8,

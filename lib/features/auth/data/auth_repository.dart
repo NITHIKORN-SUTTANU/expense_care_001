@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import '../domain/models/user_model.dart';
 import '../../../core/errors/failure.dart';
+import '../../../core/constants/firestore_constants.dart';
 
 class AuthRepository {
   AuthRepository({
@@ -111,7 +112,7 @@ class AuthRepository {
     final firebaseUser = _auth.currentUser;
     if (firebaseUser == null) return null;
     final doc =
-        await _firestore.collection('users').doc(firebaseUser.uid).get();
+        await _firestore.collection(FirestoreCollections.users).doc(firebaseUser.uid).get();
     if (!doc.exists) return null;
     return UserModel.fromMap(doc.data()!, doc.id);
   }
@@ -119,14 +120,14 @@ class AuthRepository {
   Stream<UserModel?> watchCurrentUser() {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return Stream.value(null);
-    return _firestore.collection('users').doc(uid).snapshots().map((snap) {
+    return _firestore.collection(FirestoreCollections.users).doc(uid).snapshots().map((snap) {
       if (!snap.exists) return null;
       return UserModel.fromMap(snap.data()!, snap.id);
     });
   }
 
   Future<void> updateUser(UserModel user) async {
-    await _firestore.collection('users').doc(user.uid).update(
+    await _firestore.collection(FirestoreCollections.users).doc(user.uid).update(
         {...user.toMap(), 'updatedAt': DateTime.now().toIso8601String()});
   }
 
@@ -134,7 +135,7 @@ class AuthRepository {
     final user = _auth.currentUser;
     if (user == null) return;
     await user.updateDisplayName(displayName.trim());
-    await _firestore.collection('users').doc(user.uid).update({
+    await _firestore.collection(FirestoreCollections.users).doc(user.uid).update({
       'displayName': displayName.trim(),
       'updatedAt': DateTime.now().toIso8601String(),
     });
@@ -190,12 +191,16 @@ class AuthRepository {
     }
 
     final uid = user.uid;
-    final userRef = _firestore.collection('users').doc(uid);
+    final userRef = _firestore.collection(FirestoreCollections.users).doc(uid);
 
     // Firestore does NOT cascade-delete subcollections when a parent document
-    // is deleted. Manually purge every subcollection in batches of 500 first.
-    for (final sub in ['expenses', 'goals', 'recurring']) {
-      var query = userRef.collection(sub).limit(500);
+    // is deleted. Manually purge every subcollection in batches first.
+    for (final sub in [
+      FirestoreCollections.expenses,
+      FirestoreCollections.goals,
+      FirestoreCollections.recurring
+    ]) {
+      var query = userRef.collection(sub).limit(FirestoreConfig.maxBatchSize);
       while (true) {
         final snap = await query.get();
         if (snap.docs.isEmpty) break;
@@ -204,7 +209,7 @@ class AuthRepository {
           batch.delete(doc.reference);
         }
         await batch.commit();
-        if (snap.docs.length < 500) break;
+        if (snap.docs.length < FirestoreConfig.maxBatchSize) break;
       }
     }
 
@@ -216,7 +221,7 @@ class AuthRepository {
 
   Future<UserModel> _fetchOrCreateUser(User firebaseUser) async {
     final doc =
-        await _firestore.collection('users').doc(firebaseUser.uid).get();
+        await _firestore.collection(FirestoreCollections.users).doc(firebaseUser.uid).get();
     if (doc.exists) return UserModel.fromMap(doc.data()!, doc.id);
     return _createUserDocument(
       uid: firebaseUser.uid,
@@ -241,7 +246,7 @@ class AuthRepository {
       createdAt: now,
       updatedAt: now,
     );
-    await _firestore.collection('users').doc(uid).set(user.toMap());
+    await _firestore.collection(FirestoreCollections.users).doc(uid).set(user.toMap());
     return user;
   }
 
