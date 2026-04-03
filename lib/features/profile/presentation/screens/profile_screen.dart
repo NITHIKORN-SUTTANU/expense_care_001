@@ -533,13 +533,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         trailing: ThemeToggle(
                           selectedMode: themeMode,
                           onChanged: (mode) {
-                            ref.read(themeProvider.notifier).fromString(
-                                  mode == ThemeMode.light
-                                      ? 'light'
-                                      : mode == ThemeMode.dark
-                                          ? 'dark'
-                                          : 'system',
-                                );
+                            final themeString = mode == ThemeMode.light
+                                ? 'light'
+                                : mode == ThemeMode.dark
+                                    ? 'dark'
+                                    : 'system';
+                            // Update UI immediately
+                            ref
+                                .read(themeProvider.notifier)
+                                .fromString(themeString);
+                            // Persist to Firestore
+                            ref
+                                .read(userPreferencesNotifierProvider.notifier)
+                                .updateTheme(themeString);
                           },
                         ),
                         showDivider: false,
